@@ -61,7 +61,32 @@ const App = {
                 throw new Error('Supabase não configurado. Verifique js/supabase-config.js');
             }
 
-            // Check Auth using Supabase
+            // ALWAYS listen for auth changes (must be before getSession)
+            supabase.auth.onAuthStateChange(async (event, session) => {
+                if (event === 'SIGNED_IN' && session) {
+                    db.setUserId(session.user.id);
+                    document.getElementById('login-screen').classList.add('hidden');
+
+                    if (!this.initialized) {
+                        await db.init();
+                        await MapsService.loadApiKey();
+                        this.setupNavigation();
+                        this.initialized = true;
+                        this.navigate('dashboard');
+
+                        window.addEventListener('resize', () => {
+                            if (App.currentPage === 'dashboard') setTimeout(() => Pages.dashboard.drawCharts && Pages.dashboard.render(), 200);
+                        });
+                    } else {
+                        this.refreshCurrentPage();
+                    }
+                } else if (event === 'SIGNED_OUT') {
+                    document.getElementById('login-screen').classList.remove('hidden');
+                    this.initialized = false;
+                }
+            });
+
+            // Check existing session
             const { data, error } = await supabase.auth.getSession();
             if (error) throw error;
 
@@ -69,12 +94,11 @@ const App = {
 
             if (!session) {
                 document.getElementById('login-screen').classList.remove('hidden');
-                // Even if not logged in, we setup nav so it works when they do login
                 this.setupNavigation();
                 return;
             }
 
-            // Apply session to DB
+            // Already logged in — init immediately
             db.setUserId(session.user.id);
             document.getElementById('login-screen').classList.add('hidden');
 
@@ -85,23 +109,6 @@ const App = {
 
             window.addEventListener('resize', () => {
                 if (App.currentPage === 'dashboard') setTimeout(() => Pages.dashboard.drawCharts && Pages.dashboard.render(), 200);
-            });
-
-            // Listen for Auth changes
-            supabase.auth.onAuthStateChange((event, session) => {
-                if (event === 'SIGNED_IN' && session) {
-                    db.setUserId(session.user.id);
-                    document.getElementById('login-screen').classList.add('hidden');
-                    if (!this.initialized) {
-                        this.initialized = true;
-                        this.navigate('dashboard');
-                    } else {
-                        this.refreshCurrentPage();
-                    }
-                } else if (event === 'SIGNED_OUT') {
-                    document.getElementById('login-screen').classList.remove('hidden');
-                    this.initialized = false;
-                }
             });
 
             this.initialized = true;
