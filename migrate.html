@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Migração de Dados — Frota Control</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #0a0e1a;
+            color: #e2e8f0;
+            padding: 40px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            margin-bottom: 32px;
+        }
+
+        .card {
+            background: #1e1e2d;
+            border: 1px solid #2a2a3c;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .card h3 {
+            margin-bottom: 16px;
+            font-size: 1.1rem;
+        }
+
+        .store-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #2a2a3c;
+        }
+
+        .store-row:last-child {
+            border-bottom: none;
+        }
+
+        .store-name {
+            font-weight: 600;
+        }
+
+        .store-count {
+            color: #6366f1;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 14px 32px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 1rem;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #6366f1;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #4f46e5;
+        }
+
+        .btn-primary:disabled {
+            background: #4a4a5e;
+            cursor: not-allowed;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .status {
+            margin-top: 16px;
+            padding: 16px;
+            background: #0f172a;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            line-height: 1.6;
+        }
+
+        .success {
+            color: #22c55e;
+        }
+
+        .error {
+            color: #ef4444;
+        }
+
+        .warning {
+            color: #f59e0b;
+        }
+
+        .info {
+            color: #6366f1;
+        }
+
+        .step {
+            margin-bottom: 24px;
+        }
+
+        .step-title {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 8px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #2a2a3c;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 12px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #6366f1;
+            transition: width 0.3s;
+            border-radius: 4px;
+        }
+
+        .mt-2 {
+            margin-top: 12px;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        a {
+            color: #6366f1;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🚛 Migração de Dados</h1>
+        <p class="subtitle">IndexedDB Local → Supabase Cloud</p>
+
+        <div class="card">
+            <h3>📦 Passo 1 — Verificar Dados Locais</h3>
+            <p style="color:#94a3b8;font-size:0.9rem;margin-bottom:12px">Primeiro, vamos verificar quais dados existem
+                no IndexedDB do seu navegador.</p>
+            <button class="btn btn-primary" id="btn-scan" onclick="scanIndexedDB()">🔍 Escanear IndexedDB</button>
+            <div id="scan-result"></div>
+        </div>
+
+        <div class="card" id="step2" style="opacity:0.4;pointer-events:none">
+            <h3>🔐 Passo 2 — Fazer Login no Supabase</h3>
+            <p style="color:#94a3b8;font-size:0.9rem;margin-bottom:12px">Faça login com sua conta do Frota Control para
+                enviar os dados.</p>
+            <div style="display:flex;gap:12px;flex-wrap:wrap">
+                <input type="email" id="mig-email" placeholder="Seu email"
+                    style="flex:1;padding:10px 14px;background:#2a2a3c;border:1px solid #3f3f50;border-radius:8px;color:white;font-size:0.9rem">
+                <input type="password" id="mig-password" placeholder="Senha"
+                    style="flex:1;padding:10px 14px;background:#2a2a3c;border:1px solid #3f3f50;border-radius:8px;color:white;font-size:0.9rem">
+                <button class="btn btn-primary" onclick="loginSupabase()">Entrar</button>
+            </div>
+            <div id="login-status" class="status" style="display:none"></div>
+        </div>
+
+        <div class="card" id="step3" style="opacity:0.4;pointer-events:none">
+            <h3>🚀 Passo 3 — Migrar Dados</h3>
+            <p style="color:#94a3b8;font-size:0.9rem;margin-bottom:12px">Clique para enviar todos os dados locais para o
+                Supabase.</p>
+            <button class="btn btn-primary" id="btn-migrate" onclick="migrateAll()">📤 Iniciar Migração</button>
+            <div class="progress-bar mt-2" id="progress-bar" style="display:none">
+                <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+            </div>
+            <div id="migration-log" class="status" style="display:none"></div>
+        </div>
+
+        <p class="text-center" style="margin-top:24px;color:#64748b;font-size:0.85rem">
+            <a href="index.html">← Voltar ao Frota Control</a>
+        </p>
+    </div>
+
+    <script>
+        // Supabase config (same as main app)
+        const SUPABASE_URL = 'https://gqoefhecnsayjxyoutzo.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdxb2VmaGVjbnNheWp4eW91dHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5Njk3MTIsImV4cCI6MjA4NjU0NTcxMn0.WKJD2b59-pDXWXb0tDPPfXwu7GNncY_BHBjyBe9hY4k';
+        const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // The old IndexedDB database name (from original database.js)
+        const DB_NAME = 'FrotaControlDB';
+        const DB_VERSION = 5;
+
+        // Store name -> Supabase table mapping
+        const STORE_MAP = {
+            'trucks': 'trucks',
+            'fuelings': 'fuelings',
+            'freights': 'freights',
+            'fines': 'fines',
+            'users': 'app_users',
+            'truckExpenses': 'truck_expenses',
+            'driverExpenses': 'driver_expenses',
+            'driverBonuses': 'driver_bonuses',
+            'driverDiscounts': 'driver_discounts',
+            'closings': 'closings',
+            'settings': 'settings'
+        };
+
+        let localData = {};
+        let logEl, progressEl;
+
+        function log(msg, type = '') {
+            if (!logEl) return;
+            const span = document.createElement('span');
+            span.className = type;
+            span.textContent = msg + '\n';
+            logEl.appendChild(span);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        // Step 1: Scan IndexedDB
+        async function scanIndexedDB() {
+            const resultEl = document.getElementById('scan-result');
+            resultEl.innerHTML = '<p style="color:#94a3b8;margin-top:12px">Escaneando...</p>';
+
+            try {
+                const db = await openIDB();
+                const storeNames = Array.from(db.objectStoreNames);
+
+                if (storeNames.length === 0) {
+                    resultEl.innerHTML = '<p class="warning" style="margin-top:12px">⚠️ Nenhum dado encontrado no IndexedDB. O banco pode já ter sido limpo ou nunca existiu neste navegador.</p>';
+                    return;
+                }
+
+                let html = '<div style="margin-top:16px">';
+                let totalRecords = 0;
+
+                for (const name of storeNames) {
+                    const records = await getAllFromStore(db, name);
+                    localData[name] = records;
+                    totalRecords += records.length;
+                    html += `<div class="store-row">
+                    <span class="store-name">${getStoreLabel(name)}</span>
+                    <span class="store-count">${records.length} registros</span>
+                </div>`;
+                }
+
+                html += '</div>';
+                html += `<p style="margin-top:12px;color:#22c55e;font-weight:600">✅ Total: ${totalRecords} registros encontrados em ${storeNames.length} tabelas</p>`;
+                resultEl.innerHTML = html;
+                db.close();
+
+                if (totalRecords > 0) {
+                    document.getElementById('step2').style.opacity = '1';
+                    document.getElementById('step2').style.pointerEvents = 'auto';
+                }
+
+            } catch (e) {
+                resultEl.innerHTML = `<p class="error" style="margin-top:12px">❌ Erro ao acessar IndexedDB: ${e.message}</p>`;
+            }
+        }
+
+        function getStoreLabel(name) {
+            const labels = {
+                trucks: '🚛 Caminhões',
+                fuelings: '⛽ Abastecimentos',
+                freights: '📦 Fretes',
+                fines: '🚨 Multas',
+                users: '👥 Usuários',
+                truckExpenses: '💸 Despesas Caminhão',
+                driverExpenses: '📝 Despesas Motorista',
+                driverBonuses: '🏆 Bônus',
+                driverDiscounts: '💰 Vales/Descontos',
+                closings: '📊 Fechamentos',
+                settings: '⚙️ Configurações'
+            };
+            return labels[name] || name;
+        }
+
+        function openIDB() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open(DB_NAME, DB_VERSION);
+                req.onerror = () => reject(new Error('Não foi possível abrir o IndexedDB'));
+                req.onsuccess = () => resolve(req.result);
+                req.onupgradeneeded = (e) => {
+                    // Don't create stores, just open existing
+                    // If it tries to upgrade, the DB might not exist
+                };
+            });
+        }
+
+        function getAllFromStore(db, storeName) {
+            return new Promise((resolve, reject) => {
+                try {
+                    const tx = db.transaction(storeName, 'readonly');
+                    const store = tx.objectStore(storeName);
+                    const req = store.getAll();
+                    req.onsuccess = () => resolve(req.result || []);
+                    req.onerror = () => resolve([]);
+                } catch (e) {
+                    resolve([]);
+                }
+            });
+        }
+
+        // Step 2: Login
+        async function loginSupabase() {
+            const email = document.getElementById('mig-email').value;
+            const password = document.getElementById('mig-password').value;
+            const statusEl = document.getElementById('login-status');
+            statusEl.style.display = 'block';
+            statusEl.innerHTML = '<span class="info">Conectando...</span>';
+
+            try {
+                const { data, error } = await sb.auth.signInWithPassword({ email, password });
+                if (error) throw error;
+                statusEl.innerHTML = '<span class="success">✅ Login realizado com sucesso! ID: ' + data.user.id + '</span>';
+
+                document.getElementById('step3').style.opacity = '1';
+                document.getElementById('step3').style.pointerEvents = 'auto';
+            } catch (e) {
+                statusEl.innerHTML = '<span class="error">❌ Erro: ' + e.message + '</span>';
+            }
+        }
+
+        // Step 3: Migrate
+        async function migrateAll() {
+            logEl = document.getElementById('migration-log');
+            progressEl = document.getElementById('progress-fill');
+            const progressBar = document.getElementById('progress-bar');
+
+            logEl.style.display = 'block';
+            logEl.innerHTML = '';
+            progressBar.style.display = 'block';
+
+            document.getElementById('btn-migrate').disabled = true;
+
+            const storeNames = Object.keys(localData).filter(name => localData[name].length > 0);
+            const totalStores = storeNames.length;
+            let migratedTotal = 0;
+            let errorsTotal = 0;
+
+            // We need to migrate in order: trucks and users first (they may be referenced by other tables)
+            const order = ['settings', 'trucks', 'users', 'fuelings', 'freights', 'fines', 'truckExpenses', 'driverExpenses', 'driverBonuses', 'driverDiscounts', 'closings'];
+            const sortedStores = storeNames.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+
+            // Map old IDs to new IDs for foreign key resolution
+            const idMap = { trucks: {}, users: {} };
+
+            for (let i = 0; i < sortedStores.length; i++) {
+                const storeName = sortedStores[i];
+                const records = localData[storeName];
+                const table = STORE_MAP[storeName];
+
+                if (!table) {
+                    log(`⚠️ Tabela desconhecida: ${storeName}, pulando...`, 'warning');
+                    continue;
+                }
+
+                log(`\n📤 Migrando ${getStoreLabel(storeName)} (${records.length} registros)...`, 'info');
+
+                for (const record of records) {
+                    try {
+                        const payload = preparePayload(storeName, record, idMap);
+
+                        if (storeName === 'settings') {
+                            // Settings use upsert with key
+                            const { error } = await sb.from('settings')
+                                .upsert({ key: record.key, value: record.value }, { onConflict: 'key' });
+                            if (error) throw error;
+                            log(`  ✅ Setting: ${record.key}`, 'success');
+                        } else {
+                            const oldId = record.id;
+                            delete payload.id; // Let Supabase generate new ID
+
+                            const { data: inserted, error } = await sb.from(table)
+                                .insert(payload)
+                                .select()
+                                .single();
+
+                            if (error) throw error;
+
+                            // Track ID mapping for trucks and users
+                            if (storeName === 'trucks' || storeName === 'users') {
+                                idMap[storeName][oldId] = inserted.id;
+                            }
+
+                            log(`  ✅ ${payload.placa || payload.nome || payload.cliente || payload.motivo || 'ID:' + inserted.id}`, 'success');
+                        }
+
+                        migratedTotal++;
+                    } catch (e) {
+                        errorsTotal++;
+                        log(`  ❌ Erro: ${e.message} | Dado: ${JSON.stringify(record).substring(0, 100)}`, 'error');
+                    }
+                }
+
+                const pct = Math.round(((i + 1) / totalStores) * 100);
+                progressEl.style.width = pct + '%';
+            }
+
+            progressEl.style.width = '100%';
+            log(`\n${'═'.repeat(50)}`, 'info');
+            log(`✅ Migração concluída!`, 'success');
+            log(`📊 ${migratedTotal} registros migrados com sucesso`, 'success');
+            if (errorsTotal > 0) {
+                log(`⚠️ ${errorsTotal} erros encontrados (verifique acima)`, 'warning');
+            }
+            log(`\n💡 Agora acesse o Frota Control e verifique se seus dados estão lá!`, 'info');
+
+            document.getElementById('btn-migrate').disabled = false;
+            document.getElementById('btn-migrate').textContent = '✅ Migração Concluída';
+        }
+
+        function preparePayload(storeName, record, idMap) {
+            const payload = { ...record };
+
+            // Remove internal IndexedDB fields
+            delete payload.id;
+
+            // Resolve truckId foreign key
+            if (payload.truckId && idMap.trucks[payload.truckId]) {
+                payload.truckId = idMap.trucks[payload.truckId];
+            }
+
+            // Resolve userId (driver reference) foreign key
+            if (storeName !== 'users' && payload.userId && idMap.users[payload.userId]) {
+                payload.userId = idMap.users[payload.userId];
+            }
+
+            // Remove created_at and user_id (Supabase fills these via RLS defaults)
+            delete payload.created_at;
+            delete payload.user_id;
+
+            return payload;
+        }
+    </script>
+</body>
+
+</html>
