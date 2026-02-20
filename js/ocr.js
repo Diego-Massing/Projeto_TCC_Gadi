@@ -34,7 +34,7 @@ const OCR = {
     },
 
     // Compress image before sending (receipts can be large photos)
-    async compressImage(file, maxWidth = 1200) {
+    async compressImage(file, maxWidth = 800) {
         return new Promise((resolve) => {
             const img = new Image();
             const url = URL.createObjectURL(file);
@@ -83,29 +83,51 @@ IMPORTANTE:
 - Retorne APENAS o JSON, sem texto adicional
 - Se a imagem não for um cupom de abastecimento, retorne {"erro": "Imagem não parece ser um cupom de abastecimento"}`;
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${this.apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [
-                        { text: prompt },
-                        { inline_data: { mime_type: 'image/jpeg', data: base64 } }
-                    ]
-                }],
-                generationConfig: {
-                    temperature: 0.1,
-                    maxOutputTokens: 500
-                }
-            })
-        });
+        // Try multiple models (fallback for quota/availability)
+        const models = ['gemini-1.5-flash', 'gemini-2.0-flash-lite', 'gemini-2.0-flash'];
+        let response = null;
+        let lastError = null;
 
-        if (!response.ok) {
-            const err = await response.json().catch(() => ({}));
-            if (response.status === 400 || response.status === 403) {
-                throw new Error('Chave da API Gemini inválida. Verifique em Configurações.');
+        for (const model of models) {
+            try {
+                response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [
+                                { text: prompt },
+                                { inline_data: { mime_type: 'image/jpeg', data: base64 } }
+                            ]
+                        }],
+                        generationConfig: {
+                            temperature: 0.1,
+                            maxOutputTokens: 500
+                        }
+                    })
+                });
+
+                if (response.ok) break; // Success!
+
+                const err = await response.json().catch(() => ({}));
+                lastError = err.error?.message || response.statusText;
+                console.warn(`OCR: Model ${model} failed: ${lastError}`);
+
+                // If it's an auth error, don't try other models
+                if (response.status === 400 || response.status === 403) {
+                    throw new Error('Chave da API Gemini inválida. Verifique em Configurações.');
+                }
+
+                response = null; // Reset so we try next model
+            } catch (e) {
+                if (e.message.includes('inválida')) throw e;
+                lastError = e.message;
+                console.warn(`OCR: Model ${model} error: ${e.message}`);
             }
-            throw new Error(`Erro na API Gemini: ${err.error?.message || response.statusText}`);
+        }
+
+        if (!response || !response.ok) {
+            throw new Error(`Erro na API Gemini: ${lastError || 'Todos os modelos falharam'}. Verifique sua chave em aistudio.google.com`);
         }
 
         const result = await response.json();
