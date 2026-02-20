@@ -7,7 +7,7 @@ Pages.fines = {
         document.getElementById('page-content').innerHTML = `
             <div class="page-header"><div class="page-header-row">
                 <div><h1 class="page-title">Multas</h1><p class="page-subtitle">Registro geral de multas</p></div>
-                <button class="btn btn-primary" onclick="Pages.fines.showForm()">＋ Nova Multa</button>
+                ${App.userRole === 'admin' ? `<button class="btn btn-primary" onclick="Pages.fines.showForm()">＋ Nova Multa</button>` : ''}
             </div></div>
             <div class="page-body">
                 <div class="filter-bar">
@@ -25,7 +25,7 @@ Pages.fines = {
                 <td class="font-mono font-bold">${t?.placa || '—'}</td><td>${Utils.formatDate(f.data)}</td><td>${f.descricao || '—'}</td><td>${f.local || '—'}</td>
                 <td class="font-bold text-danger">${Utils.formatCurrency(f.valor)}</td><td>${f.pontos || '—'}</td>
                 <td><span class="badge ${f.status === 'paga' ? 'badge-success' : f.status === 'recorrida' ? 'badge-info' : 'badge-danger'}">${f.status || 'pendente'}</span></td>
-                <td><button class="btn btn-icon btn-secondary btn-sm" onclick="Pages.fines.showForm(${f.id})">✏️</button> <button class="btn btn-icon btn-sm" style="color:var(--accent-danger)" onclick="Pages.fines.remove(${f.id})">🗑️</button></td>
+                <td>${App.userRole === 'admin' ? `<button class="btn btn-icon btn-secondary btn-sm" onclick="Pages.fines.showForm(${f.id})">✏️</button> <button class="btn btn-icon btn-sm" style="color:var(--accent-danger)" onclick="Pages.fines.remove(${f.id})">🗑️</button>` : ''}</td>
             </tr>`;
         }).join('')}</tbody></table></div>
             <div class="table-footer"><span>${fines.length} multas</span><span><strong>Total: ${Utils.formatCurrency(total)}</strong></span></div>`;

@@ -51,6 +51,10 @@ const App = {
     currentParam: null,
     isRegistering: false,
     initialized: false,
+    userRole: 'admin',      // admin | visualizador | motorista
+    userTruckId: null,      // truck assigned to driver
+    userAppId: null,         // app_users record id
+    userEmail: null,
 
     async init() {
         if (this.initialized) return;
@@ -65,14 +69,17 @@ const App = {
             supabase.auth.onAuthStateChange(async (event, session) => {
                 if (event === 'SIGNED_IN' && session) {
                     db.setUserId(session.user.id);
+                    this.userEmail = session.user.email;
                     document.getElementById('login-screen').classList.add('hidden');
 
                     if (!this.initialized) {
                         await db.init();
+                        await this.loadCurrentUser();
                         await MapsService.loadApiKey();
                         this.setupNavigation();
+                        this.applyRoleRestrictions();
                         this.initialized = true;
-                        this.navigate('dashboard');
+                        this.navigate(this.userRole === 'motorista' ? 'fuelings' : 'dashboard');
 
                         window.addEventListener('resize', () => {
                             if (App.currentPage === 'dashboard') setTimeout(() => Pages.dashboard.drawCharts && Pages.dashboard.render(), 200);
@@ -100,12 +107,15 @@ const App = {
 
             // Already logged in — init immediately
             db.setUserId(session.user.id);
+            this.userEmail = session.user.email;
             document.getElementById('login-screen').classList.add('hidden');
 
             await db.init();
+            await this.loadCurrentUser();
             await MapsService.loadApiKey();
             this.setupNavigation();
-            this.navigate('dashboard');
+            this.applyRoleRestrictions();
+            this.navigate(this.userRole === 'motorista' ? 'fuelings' : 'dashboard');
 
             window.addEventListener('resize', () => {
                 if (App.currentPage === 'dashboard') setTimeout(() => Pages.dashboard.drawCharts && Pages.dashboard.render(), 200);
@@ -124,6 +134,57 @@ const App = {
                 </div>
             `;
         }
+    },
+
+    // Load current user profile from app_users by matching auth email
+    async loadCurrentUser() {
+        try {
+            const users = await db.getAll('users');
+            const match = users.find(u => u.authEmail && u.authEmail.toLowerCase() === this.userEmail?.toLowerCase());
+            if (match) {
+                this.userRole = match.role || 'admin';
+                this.userTruckId = match.truckId || null;
+                this.userAppId = match.id;
+                console.log(`RBAC: Logged in as ${match.nome} (${this.userRole})${this.userTruckId ? ', truck=' + this.userTruckId : ''}`);
+            } else {
+                // No matching app_users record = system owner = admin
+                this.userRole = 'admin';
+                this.userTruckId = null;
+                this.userAppId = null;
+                console.log('RBAC: No app_users match — defaulting to admin');
+            }
+        } catch (e) {
+            console.error('RBAC: Error loading user profile:', e);
+            this.userRole = 'admin';
+        }
+    },
+
+    // Filter sidebar and UI based on role
+    applyRoleRestrictions() {
+        const role = this.userRole;
+        document.querySelectorAll('.nav-item[data-roles]').forEach(item => {
+            const allowed = item.dataset.roles.split(',');
+            if (allowed.includes(role)) {
+                item.style.display = '';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+        // Hide empty nav sections (where all items are hidden)
+        document.querySelectorAll('.nav-section').forEach(section => {
+            const visibleItems = section.querySelectorAll('.nav-item:not([style*="display: none"])');
+            section.style.display = visibleItems.length > 0 ? '' : 'none';
+        });
+    },
+
+    // Check if current user can access a page
+    canAccess(page) {
+        const access = {
+            admin: ['dashboard', 'trucks', 'truck-detail', 'fuelings', 'truck-expenses', 'freights', 'fines', 'users', 'driver-closing', 'closing', 'import', 'settings'],
+            visualizador: ['dashboard', 'trucks', 'truck-detail', 'fuelings', 'truck-expenses', 'freights', 'fines', 'users', 'driver-closing', 'closing'],
+            motorista: ['fuelings', 'freights']
+        };
+        return (access[this.userRole] || access.admin).includes(page);
     },
 
     setupNavigation() {
@@ -147,6 +208,11 @@ const App = {
     },
 
     async navigate(page, param) {
+        // Block unauthorized pages
+        if (!this.canAccess(page)) {
+            Utils.showToast('Sem permissão para acessar esta página', 'warning');
+            return;
+        }
         this.currentPage = page;
         this.currentParam = param;
         // Update active nav

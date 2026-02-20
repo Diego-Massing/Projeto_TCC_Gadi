@@ -10,7 +10,7 @@ Pages.users = {
         document.getElementById('page-content').innerHTML = `
             <div class="page-header"><div class="page-header-row">
                 <div><h1 class="page-title">👥 Usuários</h1><p class="page-subtitle">${users.length} usuários — ${drivers.length} motoristas, ${admins.length} admins, ${viewers.length} visualizadores</p></div>
-                <button class="btn btn-primary" onclick="Pages.users.showForm()">＋ Novo Usuário</button>
+                ${App.userRole === 'admin' ? `<button class="btn btn-primary" onclick="Pages.users.showForm()">＋ Novo Usuário</button>` : ''}
             </div></div>
             <div class="page-body">
                 ${users.length === 0 ? '<div class="empty-state"><div class="empty-icon">👥</div><h3>Nenhum usuário cadastrado</h3><p>Adicione motoristas, visualizadores e administradores.</p><button class="btn btn-primary btn-lg" onclick="Pages.users.showForm()">＋ Adicionar Usuário</button></div>' :
@@ -26,9 +26,9 @@ Pages.users = {
                             <td>${u.telefone || '—'}</td>
                             <td>${u.role === 'motorista' ? Utils.formatCurrency(u.salarioFixo || 0) : '—'}</td>
                             <td>
-                                <button class="btn btn-icon btn-secondary btn-sm" onclick="Pages.users.showForm(${u.id})">✏️</button>
+                                ${App.userRole === 'admin' ? `<button class="btn btn-icon btn-secondary btn-sm" onclick="Pages.users.showForm(${u.id})">✏️</button>` : ''}
                                 ${u.role === 'motorista' ? `<button class="btn btn-icon btn-secondary btn-sm" onclick="App.navigate('driver-closing',${u.id})" title="Fechamento">📊</button>` : ''}
-                                <button class="btn btn-icon btn-sm" style="color:var(--accent-danger)" onclick="Pages.users.remove(${u.id})">🗑️</button>
+                                ${App.userRole === 'admin' ? `<button class="btn btn-icon btn-sm" style="color:var(--accent-danger)" onclick="Pages.users.remove(${u.id})">🗑️</button>` : ''}
                             </td>
                         </tr>`;
                 }).join('')}</tbody></table></div>`}

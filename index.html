@@ -160,49 +160,49 @@
             <nav class="sidebar-nav">
                 <div class="nav-section">
                     <div class="nav-section-title">Principal</div>
-                    <button class="nav-item active" data-page="dashboard">
+                    <button class="nav-item active" data-page="dashboard" data-roles="admin,visualizador">
                         <span class="nav-icon">📊</span> Dashboard
                     </button>
-                    <button class="nav-item" data-page="trucks">
+                    <button class="nav-item" data-page="trucks" data-roles="admin,visualizador">
                         <span class="nav-icon">🚛</span> Caminhões
                     </button>
                 </div>
                 <div class="nav-section">
                     <div class="nav-section-title">Planilhas</div>
-                    <button class="nav-item" data-page="fuelings">
+                    <button class="nav-item" data-page="fuelings" data-roles="admin,visualizador,motorista">
                         <span class="nav-icon">⛽</span> Abastecimentos
                     </button>
-                    <button class="nav-item" data-page="truck-expenses">
+                    <button class="nav-item" data-page="truck-expenses" data-roles="admin,visualizador">
                         <span class="nav-icon">💸</span> Despesas da Frota
                     </button>
-                    <button class="nav-item" data-page="freights">
+                    <button class="nav-item" data-page="freights" data-roles="admin,visualizador,motorista">
                         <span class="nav-icon">📦</span> Fretes
                     </button>
-                    <button class="nav-item" data-page="fines">
+                    <button class="nav-item" data-page="fines" data-roles="admin,visualizador">
                         <span class="nav-icon">🚨</span> Multas
                     </button>
                 </div>
                 <div class="nav-section">
                     <div class="nav-section-title">Motoristas</div>
-                    <button class="nav-item" data-page="users">
+                    <button class="nav-item" data-page="users" data-roles="admin,visualizador">
                         <span class="nav-icon">👥</span> Usuários
                     </button>
-                    <button class="nav-item" data-page="driver-closing">
+                    <button class="nav-item" data-page="driver-closing" data-roles="admin,visualizador">
                         <span class="nav-icon">💼</span> Comissões
                     </button>
                 </div>
                 <div class="nav-section">
                     <div class="nav-section-title">Relatórios</div>
-                    <button class="nav-item" data-page="closing">
+                    <button class="nav-item" data-page="closing" data-roles="admin,visualizador">
                         <span class="nav-icon">📋</span> Fechamento Mensal
                     </button>
                 </div>
                 <div class="nav-section">
                     <div class="nav-section-title">Sistema</div>
-                    <button class="nav-item" data-page="import">
+                    <button class="nav-item" data-page="import" data-roles="admin">
                         <span class="nav-icon">📤</span> Importar Dados
                     </button>
-                    <button class="nav-item" data-page="settings">
+                    <button class="nav-item" data-page="settings" data-roles="admin">
                         <span class="nav-icon">⚙️</span> Configurações
                     </button>
                     <button class="nav-item" onclick="App.handleLogout()" style="margin-top:20px; color:#ef4444">

@@ -2,17 +2,30 @@
 Pages.fuelings = {
     async render() {
         const trucks = await db.getAll('trucks');
-        const fuelings = await db.getAll('fuelings');
+        let fuelings = await db.getAll('fuelings');
         fuelings.sort((a, b) => b.data?.localeCompare(a.data));
+        const isDriver = App.userRole === 'motorista';
+        const isViewer = App.userRole === 'visualizador';
+
+        // Driver: filter to only their truck
+        if (isDriver && App.userTruckId) {
+            fuelings = fuelings.filter(f => f.truckId === App.userTruckId);
+        }
+        const driverTruck = isDriver ? trucks.find(t => t.id === App.userTruckId) : null;
+        const subtitle = isDriver && driverTruck ? `Abastecimentos — ${driverTruck.placa}` : 'Planilha geral — todas as placas';
+
+        const addBtn = isViewer ? '' : `<button class="btn btn-primary" onclick="Pages.fuelings.showForm()">＋ Novo Abastecimento</button>`;
+        const exportBtn = isDriver ? '' : `<button class="btn btn-secondary btn-sm" onclick="Pages.fuelings.exportCSV()">📥 Exportar CSV</button>`;
+        const truckFilter = isDriver ? '' : `<div class="form-group"><label class="form-label">Placa</label><select class="form-control" id="filter-fuel-truck" onchange="Pages.fuelings.applyFilter()"><option value="">Todas</option>${trucks.map(t => `<option value="${t.id}">${t.placa}</option>`).join('')}</select></div>`;
 
         document.getElementById('page-content').innerHTML = `
             <div class="page-header"><div class="page-header-row">
-                <div><h1 class="page-title">Abastecimentos</h1><p class="page-subtitle">Planilha geral — todas as placas</p></div>
-                <div class="btn-group"><button class="btn btn-secondary btn-sm" onclick="Pages.fuelings.exportCSV()">📥 Exportar CSV</button><button class="btn btn-primary" onclick="Pages.fuelings.showForm()">＋ Novo Abastecimento</button></div>
+                <div><h1 class="page-title">Abastecimentos</h1><p class="page-subtitle">${subtitle}</p></div>
+                <div class="btn-group">${exportBtn}${addBtn}</div>
             </div></div>
             <div class="page-body">
                 <div class="filter-bar">
-                    <div class="form-group"><label class="form-label">Placa</label><select class="form-control" id="filter-fuel-truck" onchange="Pages.fuelings.applyFilter()"><option value="">Todas</option>${trucks.map(t => `<option value="${t.id}">${t.placa}</option>`).join('')}</select></div>
+                    ${truckFilter}
                     <div class="form-group"><label class="form-label">De</label><input type="date" class="form-control" id="filter-fuel-from" onchange="Pages.fuelings.applyFilter()"></div>
                     <div class="form-group"><label class="form-label">Até</label><input type="date" class="form-control" id="filter-fuel-to" onchange="Pages.fuelings.applyFilter()"></div>
                 </div>
@@ -29,19 +42,24 @@ Pages.fuelings = {
                 <td class="font-mono font-bold">${t?.placa || '—'}</td><td>${Utils.formatDate(f.data)}</td><td>${f.posto || '—'}</td>
                 <td>${Utils.formatNumber(f.litros, 2)}</td><td>${Utils.formatCurrency(f.valorLitro)}</td><td>${Utils.formatNumber(f.km)}</td>
                 <td class="font-bold">${Utils.formatCurrency(f.valorTotal)}</td><td><span class="badge badge-info">${f.tipoComb || 'Diesel'}</span></td>
-                <td><button class="btn btn-icon btn-secondary btn-sm" onclick="Pages.fuelings.showForm(${f.id})">✏️</button> <button class="btn btn-icon btn-sm" style="color:var(--accent-danger)" onclick="Pages.fuelings.remove(${f.id})">🗑️</button></td>
+                <td>${App.userRole !== 'visualizador' ? `<button class="btn btn-icon btn-secondary btn-sm" onclick="Pages.fuelings.showForm(${f.id})">✏️</button> <button class="btn btn-icon btn-sm" style="color:var(--accent-danger)" onclick="Pages.fuelings.remove(${f.id})">🗑️</button>` : ''}</td>
             </tr>`;
         }).join('')}</tbody></table></div>
             <div class="table-footer"><span>${fuelings.length} registros</span><span><strong>Total: ${Utils.formatCurrency(total)}</strong> — ${Utils.formatNumber(totalL, 1)} litros</span></div>`;
     },
 
     async applyFilter() {
-        const truckId = document.getElementById('filter-fuel-truck').value;
-        const from = document.getElementById('filter-fuel-from').value;
-        const to = document.getElementById('filter-fuel-to').value;
-        let fuelings = await db.getAll('fuelings');
         const trucks = await db.getAll('trucks');
-        if (truckId) fuelings = fuelings.filter(f => f.truckId === parseInt(truckId));
+        let fuelings = await db.getAll('fuelings');
+        // Driver: always filter by their truck
+        if (App.userRole === 'motorista' && App.userTruckId) {
+            fuelings = fuelings.filter(f => f.truckId === App.userTruckId);
+        } else {
+            const truckId = document.getElementById('filter-fuel-truck')?.value;
+            if (truckId) fuelings = fuelings.filter(f => f.truckId === parseInt(truckId));
+        }
+        const from = document.getElementById('filter-fuel-from')?.value;
+        const to = document.getElementById('filter-fuel-to')?.value;
         if (from) fuelings = fuelings.filter(f => f.data >= from);
         if (to) fuelings = fuelings.filter(f => f.data <= to);
         fuelings.sort((a, b) => b.data?.localeCompare(a.data));
@@ -64,7 +82,7 @@ Pages.fuelings = {
             </div>
             <hr style="border-color:#333;margin:0 0 16px 0">
             <div class="form-row">
-                <div class="form-group"><label class="form-label">Caminhão *</label><select class="form-control" id="f-truckId"><option value="">Selecione</option>${trucks.map(t => `<option value="${t.id}" ${(item?.truckId === t.id || presetTruckId === t.id) ? 'selected' : ''}>${t.placa}</option>`).join('')}</select></div>
+                <div class="form-group"><label class="form-label">Caminhão *</label><select class="form-control" id="f-truckId" ${App.userRole === 'motorista' ? 'disabled' : ''}><option value="">Selecione</option>${trucks.map(t => `<option value="${t.id}" ${(item?.truckId === t.id || presetTruckId === t.id || (App.userRole === 'motorista' && App.userTruckId === t.id)) ? 'selected' : ''}>${t.placa}</option>`).join('')}</select></div>
                 <div class="form-group"><label class="form-label">Data *</label><input type="date" class="form-control" id="f-data" value="${item?.data || new Date().toISOString().split('T')[0]}"></div>
             </div>
             <div class="form-row">
@@ -116,7 +134,7 @@ Pages.fuelings = {
     },
 
     async save(id) {
-        const truckId = parseInt(document.getElementById('f-truckId').value);
+        const truckId = parseInt(document.getElementById('f-truckId').value) || App.userTruckId;
         if (!truckId) { Utils.showToast('Selecione o caminhão', 'warning'); return; }
         const data = { truckId, data: document.getElementById('f-data').value, litros: parseFloat(document.getElementById('f-litros').value) || 0, valorLitro: parseFloat(document.getElementById('f-valorLitro').value) || 0, valorTotal: parseFloat(document.getElementById('f-valorTotal').value) || 0, km: parseInt(document.getElementById('f-km').value) || 0, posto: document.getElementById('f-posto').value.trim(), tipoComb: document.getElementById('f-tipoComb').value };
         try {
@@ -148,10 +166,24 @@ Pages.freights = {
         freights.sort((a, b) => b.data?.localeCompare(a.data));
         const { mes, ano } = Utils.getCurrentMonth();
 
+        const isDriver = App.userRole === 'motorista';
+        const isViewer = App.userRole === 'visualizador';
+
+        // Driver: filter to only their truck
+        if (isDriver && App.userTruckId) {
+            freights = freights.filter(f => f.truckId === App.userTruckId);
+        }
+        const driverTruck = isDriver ? trucks.find(t => t.id === App.userTruckId) : null;
+        const subtitle = isDriver && driverTruck ? `Fretes — ${driverTruck.placa}` : `Planilha geral — Padrão: Carregado ${Utils.formatCurrency(rates.carregado)}/km | Vazio ${Utils.formatCurrency(rates.vazio)}/km`;
+
+        const addBtn = isViewer ? '' : `<button class="btn btn-primary" onclick="Pages.freights.showForm()">＋ Novo Frete</button>`;
+        const exportBtn = isDriver ? '' : `<button class="btn btn-secondary btn-sm" onclick="Pages.freights.exportCSV()">📥 Exportar</button>`;
+        const truckFilter = isDriver ? '' : `<div class="form-group"><label class="form-label">Placa</label><select class="form-control" id="filter-fr-truck" onchange="Pages.freights.applyFilter()"><option value="">Todas</option>${trucks.map(t => `<option value="${t.id}">${t.placa}</option>`).join('')}</select></div>`;
+
         document.getElementById('page-content').innerHTML = `
             <div class="page-header"><div class="page-header-row">
-                <div><h1 class="page-title">Fretes</h1><p class="page-subtitle">Planilha geral — Padrão: Carregado ${Utils.formatCurrency(rates.carregado)}/km | Vazio ${Utils.formatCurrency(rates.vazio)}/km</p></div>
-                <div class="btn-group"><button class="btn btn-secondary btn-sm" onclick="Pages.freights.exportCSV()">📥 Exportar</button><button class="btn btn-primary" onclick="Pages.freights.showForm()">＋ Novo Frete</button></div>
+                <div><h1 class="page-title">Fretes</h1><p class="page-subtitle">${subtitle}</p></div>
+                <div class="btn-group">${exportBtn}${addBtn}</div>
             </div></div>
             <div class="page-body">
                 <div class="filter-bar">
@@ -164,7 +196,7 @@ Pages.freights = {
                             <input type="number" class="form-control" id="filter-fr-ano" value="${ano}" onchange="Pages.freights.applyFilter()" style="width:80px">
                         </div>
                     </div>
-                    <div class="form-group"><label class="form-label">Placa</label><select class="form-control" id="filter-fr-truck" onchange="Pages.freights.applyFilter()"><option value="">Todas</option>${trucks.map(t => `<option value="${t.id}">${t.placa}</option>`).join('')}</select></div>
+                    ${truckFilter}
                     <div class="form-group"><label class="form-label">Tipo</label><select class="form-control" id="filter-fr-tipo" onchange="Pages.freights.applyFilter()"><option value="">Todos</option><option value="carregado">Carregado</option><option value="vazio">Vazio</option></select></div>
                 </div>
                 <!-- Advanced Date Filter (Collapsed by default) -->
@@ -205,7 +237,7 @@ Pages.freights = {
                 <td><span class="badge ${modalColors[mod] || 'badge-info'}" style="font-size:0.68rem">${modalLabels[mod] || mod}</span></td>
                 <td>${mod === 'fechado' ? `<span class="text-muted" style="font-size:0.75rem">${Utils.formatCurrency(f.taxaKmEfetiva || f.taxaKm)}</span>` : Utils.formatCurrency(f.taxaKm)}</td>
                 <td class="font-bold text-success">${Utils.formatCurrency(f.valorFrete)}</td><td>${f.cliente || '—'}</td>
-                <td><button class="btn btn-icon btn-secondary btn-sm" onclick="Pages.freights.showForm(${f.id})">✏️</button> <button class="btn btn-icon btn-sm" style="color:var(--accent-danger)" onclick="Pages.freights.remove(${f.id})">🗑️</button></td>
+                <td>${App.userRole !== 'visualizador' ? `<button class="btn btn-icon btn-secondary btn-sm" onclick="Pages.freights.showForm(${f.id})">✏️</button> <button class="btn btn-icon btn-sm" style="color:var(--accent-danger)" onclick="Pages.freights.remove(${f.id})">🗑️</button>` : ''}</td>
             </tr>`;
         }).join('')}</tbody></table></div>
             <div class="table-footer"><span>${freights.length} fretes — ${Utils.formatNumber(totalKm)} km total</span><span><strong>Total: ${Utils.formatCurrency(total)}</strong></span></div>`;
@@ -245,8 +277,14 @@ Pages.freights = {
     async applyFilter(useDateRange = false) {
         let freights = await db.getAll('freights');
         const trucks = await db.getAll('trucks');
-        const tid = document.getElementById('filter-fr-truck').value;
-        const tipo = document.getElementById('filter-fr-tipo').value;
+        // Driver: always filter by their truck
+        if (App.userRole === 'motorista' && App.userTruckId) {
+            freights = freights.filter(f => f.truckId === App.userTruckId);
+        } else {
+            const tid = document.getElementById('filter-fr-truck')?.value;
+            if (tid) freights = freights.filter(f => f.truckId === parseInt(tid));
+        }
+        const tipo = document.getElementById('filter-fr-tipo')?.value;
 
         // Date logic
         if (useDateRange) {
@@ -272,7 +310,6 @@ Pages.freights = {
             }
         }
 
-        if (tid) freights = freights.filter(f => f.truckId === parseInt(tid));
         if (tipo) freights = freights.filter(f => f.tipo === tipo);
 
         freights.sort((a, b) => b.data?.localeCompare(a.data));
@@ -288,7 +325,7 @@ Pages.freights = {
         modal.querySelector('.modal-header h2').textContent = id ? 'Editar Frete' : 'Novo Frete';
         modal.querySelector('.modal-body').innerHTML = `
             <div class="form-row">
-                <div class="form-group"><label class="form-label">Caminhão *</label><select class="form-control" id="f-truckId" onchange="Pages.freights.onTruckChange()"><option value="">Selecione</option>${trucks.map(t => `<option value="${t.id}" ${(item?.truckId === t.id || presetTruckId === t.id) ? 'selected' : ''}>${t.placa}${t.kmCarregado != null ? ' 💰' : ''}</option>`).join('')}</select></div>
+                <div class="form-group"><label class="form-label">Caminhão *</label><select class="form-control" id="f-truckId" onchange="Pages.freights.onTruckChange()" ${App.userRole === 'motorista' ? 'disabled' : ''}><option value="">Selecione</option>${trucks.map(t => `<option value="${t.id}" ${(item?.truckId === t.id || presetTruckId === t.id || (App.userRole === 'motorista' && App.userTruckId === t.id)) ? 'selected' : ''}>${t.placa}${t.kmCarregado != null ? ' 💰' : ''}</option>`).join('')}</select></div>
                 <div class="form-group"><label class="form-label">Data *</label><input type="date" class="form-control" id="f-data" value="${item?.data || new Date().toISOString().split('T')[0]}"></div>
             </div>
             <div class="form-row">
@@ -435,7 +472,7 @@ Pages.freights = {
     },
 
     async save(id) {
-        const truckId = parseInt(document.getElementById('f-truckId').value);
+        const truckId = parseInt(document.getElementById('f-truckId').value) || App.userTruckId;
         if (!truckId) { Utils.showToast('Selecione o caminhão', 'warning'); return; }
         const mod = document.getElementById('f-modalidade').value;
         const km = parseFloat(document.getElementById('f-km').value) || 0;
@@ -484,7 +521,7 @@ Pages.truckExpenses = {
         document.getElementById('page-content').innerHTML = `
             <div class="page-header"><div class="page-header-row">
                 <div><h1 class="page-title">Despesas da Frota</h1><p class="page-subtitle">Manutenção, prestações, seguros e custos fixos</p></div>
-                <div class="btn-group"><button class="btn btn-secondary btn-sm" onclick="Pages.truckExpenses.exportCSV()">📥 Exportar</button><button class="btn btn-primary" onclick="Pages.truckExpenses.showForm()">＋ Nova Despesa</button></div>
+                <div class="btn-group">${App.userRole === 'admin' ? `<button class="btn btn-secondary btn-sm" onclick="Pages.truckExpenses.exportCSV()">📥 Exportar</button><button class="btn btn-primary" onclick="Pages.truckExpenses.showForm()">＋ Nova Despesa</button>` : ''}</div>
             </div></div>
             <div class="page-body">
                 <div class="filter-bar">
@@ -536,7 +573,7 @@ Pages.truckExpenses = {
                     <td>${e.fornecedor || '—'}</td>
                     <td>${e.descricao || '—'}</td>
                     <td class="font-bold text-danger">-${Utils.formatCurrency(e.valor)}</td>
-                    <td><button class="btn btn-icon btn-secondary btn-sm" onclick="Pages.truckExpenses.showForm(${e.id})">✏️</button> <button class="btn btn-icon btn-sm" style="color:var(--accent-danger)" onclick="Pages.truckExpenses.remove(${e.id})">🗑️</button></td>
+                    <td>${App.userRole === 'admin' ? `<button class="btn btn-icon btn-secondary btn-sm" onclick="Pages.truckExpenses.showForm(${e.id})">✏️</button> <button class="btn btn-icon btn-sm" style="color:var(--accent-danger)" onclick="Pages.truckExpenses.remove(${e.id})">🗑️</button>` : ''}</td>
                 </tr>`;
         }).join('')}</tbody>
         </table></div>
