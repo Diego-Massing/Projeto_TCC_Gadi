@@ -111,11 +111,18 @@ IMPORTANTE:
 
                 const err = await response.json().catch(() => ({}));
                 lastError = err.error?.message || response.statusText;
-                console.warn(`OCR: Model ${model} failed: ${lastError}`);
+                console.warn(`OCR: Model ${model} failed (${response.status}): ${lastError}`);
 
-                // If it's an auth error, don't try other models
-                if (response.status === 400 || response.status === 403) {
+                // If it's a definitive auth error (API key invalid), don't try other models
+                if (response.status === 403 && lastError.toLowerCase().includes('api key')) {
                     throw new Error('Chave da API Gemini inválida. Verifique em Configurações.');
+                }
+
+                // For 429 (rate limit) or quota errors, try next model
+                if (response.status === 429) {
+                    console.warn(`OCR: Rate limited on ${model}, trying next...`);
+                    response = null;
+                    continue;
                 }
 
                 response = null; // Reset so we try next model
