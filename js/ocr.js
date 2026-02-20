@@ -84,7 +84,7 @@ IMPORTANTE:
 - Se a imagem não for um cupom de abastecimento, retorne {"erro": "Imagem não parece ser um cupom de abastecimento"}`;
 
         // Try multiple models (fallback for quota/availability)
-        const models = ['gemini-2.5-flash-preview-04-17', 'gemini-2.0-flash-lite'];
+        const models = ['gemini-2.5-flash-preview-04-17'];
         let response = null;
         let lastError = null;
 
