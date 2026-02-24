@@ -248,7 +248,7 @@ Pages.trucks = {
             else { await db.add('trucks', data); Utils.showToast('Caminhão cadastrado!', 'success'); }
             App.closeModal();
             this.render();
-        } catch (e) { Utils.showToast('Erro: placa já cadastrada?', 'error'); }
+        } catch (e) { console.error('Truck save error:', e); Utils.showToast('Erro ao salvar: ' + (e.message || 'placa já cadastrada?'), 'error'); }
     },
 
     async remove(id) {
