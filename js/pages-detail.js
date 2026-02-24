@@ -144,7 +144,7 @@ Pages.truckDetail = {
         const closing = await db.generateMonthlyClosing(this.truckId, mes, ano);
         this._lastTruckClosing = closing;
         const allFuelings = closing.fuelingsForMedia || closing.fuelings || [];
-        const sortedFuelings = allFuelings.filter(f => f.km > 0).sort((a, b) => (a.data || '').localeCompare(b.data || '') || (a.km - b.km));
+        const sortedFuelings = allFuelings.filter(f => f.km > 0 && f.tipoComb !== 'Arla').sort((a, b) => (a.data || '').localeCompare(b.data || '') || (a.km - b.km));
 
         document.getElementById('closing-result').innerHTML = `
             <div class="closing-summary animate-in">
@@ -193,7 +193,7 @@ Pages.truckDetail = {
         const startId = parseInt(document.getElementById('truck-media-start')?.value);
         const endId = parseInt(document.getElementById('truck-media-end')?.value);
 
-        const fuelings = (closing.fuelingsForMedia || closing.fuelings || []).filter(f => f.km > 0).sort((a, b) => (a.data || '').localeCompare(b.data || '') || (a.km - b.km));
+        const fuelings = (closing.fuelingsForMedia || closing.fuelings || []).filter(f => f.km > 0 && f.tipoComb !== 'Arla').sort((a, b) => (a.data || '').localeCompare(b.data || '') || (a.km - b.km));
         const startFuel = fuelings.find(f => f.id === startId);
         const endFuel = fuelings.find(f => f.id === endId);
 

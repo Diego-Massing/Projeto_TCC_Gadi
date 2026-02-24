@@ -336,9 +336,9 @@ class FrotaDatabase {
         const totalMultas = fines.reduce((s, f) => s + (f.valor || 0), 0);
         const totalDespesas = expenses.reduce((s, f) => s + (f.valor || 0), 0);
 
-        const totalLitros = fuelings.reduce((s, f) => s + (f.litros || 0), 0);
+        const totalLitros = fuelings.filter(f => f.tipoComb !== 'Arla').reduce((s, f) => s + (f.litros || 0), 0);
         const totalKmFretes = freights.reduce((s, f) => s + (f.km || 0), 0);
-        const kmValues = fuelings.filter(f => f.km > 0).map(f => f.km);
+        const kmValues = fuelings.filter(f => f.km > 0 && f.tipoComb !== 'Arla').map(f => f.km);
         const totalKm = kmValues.length >= 2 ? Math.max(...kmValues) - Math.min(...kmValues) : 0;
 
         const closing = {
@@ -414,8 +414,8 @@ class FrotaDatabase {
         const totalComissaoKm = comissaoCarregado + comissaoVazio;
 
         // Fuel Efficiency
-        const totalLitros = fuelings.reduce((s, f) => s + (f.litros || 0), 0);
-        const kmValues = fuelings.filter(f => f.km > 0).map(f => f.km);
+        const totalLitros = fuelings.filter(f => f.tipoComb !== 'Arla').reduce((s, f) => s + (f.litros || 0), 0);
+        const kmValues = fuelings.filter(f => f.km > 0 && f.tipoComb !== 'Arla').map(f => f.km);
         const totalKm = kmValues.length >= 2 ? Math.max(...kmValues) - Math.min(...kmValues) : 0;
         const mediaKmL = totalKm > 0 && totalLitros > 0 ? totalKm / totalLitros : 0;
         const { premio: premioMedia, faixaAtingida } = this.calcPremioMedia(mediaKmL, commConfig.faixasPremioMedia);

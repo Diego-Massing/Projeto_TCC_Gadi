@@ -389,7 +389,7 @@ Pages.driverClosing = {
                     ${routesTable}
 
                     ${(() => {
-                const allF = (fuelingsForMedia || fuelings || []).filter(f => f.km > 0).sort((a, b) => (a.data || '').localeCompare(b.data || '') || (a.km - b.km)); return allF.length > 0 ? `
+                const allF = (fuelingsForMedia || fuelings || []).filter(f => f.km > 0 && f.tipoComb !== 'Arla').sort((a, b) => (a.data || '').localeCompare(b.data || '') || (a.km - b.km)); return allF.length > 0 ? `
                     <div class="card mt-3" style="border:2px solid var(--accent-success);background:rgba(34,197,94,0.03)">
                         <div class="card-header"><h3>\u26fd C\u00e1lculo da M\u00e9dia km/L</h3></div>
                         <div class="card-body">
@@ -423,7 +423,7 @@ Pages.driverClosing = {
             </div>`;
 
         // Trigger initial media calculation with selectors
-        if ((fuelingsForMedia || fuelings || []).filter(f => f.km > 0).length > 0) this.recalcMedia();
+        if ((fuelingsForMedia || fuelings || []).filter(f => f.km > 0 && f.tipoComb !== 'Arla').length > 0) this.recalcMedia();
     },
 
     recalcMedia() {
@@ -433,7 +433,7 @@ Pages.driverClosing = {
         const startId = parseInt(document.getElementById('media-fuel-start')?.value);
         const endId = parseInt(document.getElementById('media-fuel-end')?.value);
 
-        const fuelings = (closing.fuelingsForMedia || closing.fuelings || []).filter(f => f.km > 0).sort((a, b) => (a.data || '').localeCompare(b.data || '') || (a.km - b.km));
+        const fuelings = (closing.fuelingsForMedia || closing.fuelings || []).filter(f => f.km > 0 && f.tipoComb !== 'Arla').sort((a, b) => (a.data || '').localeCompare(b.data || '') || (a.km - b.km));
         const startFuel = fuelings.find(f => f.id === startId);
         const endFuel = fuelings.find(f => f.id === endId);
 

@@ -93,10 +93,26 @@ Pages.fuelings = {
             <div class="form-row">
                 <div class="form-group"><label class="form-label">KM Atual</label><input type="number" class="form-control" id="f-km" value="${item?.km || ''}"></div>
                 <div class="form-group"><label class="form-label">Posto</label><input type="text" class="form-control" id="f-posto" value="${item?.posto || ''}"></div>
-                <div class="form-group"><label class="form-label">Combustível</label><select class="form-control" id="f-tipoComb"><option value="Diesel" ${item?.tipoComb === 'Diesel' ? 'selected' : ''}>Diesel</option><option value="Diesel S-10" ${item?.tipoComb === 'Diesel S-10' ? 'selected' : ''}>Diesel S-10</option><option value="Arla" ${item?.tipoComb === 'Arla' ? 'selected' : ''}>Arla</option></select></div>
+                <div class="form-group"><label class="form-label">Combustível</label><select class="form-control" id="f-tipoComb" onchange="Pages.fuelings.toggleArlaField()"><option value="Diesel" ${item?.tipoComb === 'Diesel' ? 'selected' : ''}>Diesel</option><option value="Diesel S-10" ${item?.tipoComb === 'Diesel S-10' ? 'selected' : ''}>Diesel S-10</option><option value="Arla" ${item?.tipoComb === 'Arla' ? 'selected' : ''}>Arla</option></select></div>
+            </div>
+            <div class="form-row" id="f-arla-container" style="display:${(!item || item?.tipoComb === 'Diesel' || item?.tipoComb === 'Diesel S-10' || item?.tipoComb === 'Diesel+Arla') ? 'flex' : 'none'};background:var(--bg-secondary);padding:12px;border-radius:8px;align-items:center;border:1px dashed var(--border-color)">
+                <div style="flex:1">
+                    <label class="form-label" style="color:var(--accent-info)">Complemento Arla (R$)</label>
+                    <input type="number" step="0.01" class="form-control" id="f-valorArla" value="${item?.valorArla || ''}" placeholder="Opcional" oninput="Pages.fuelings.calcTotal()">
+                    <small class="text-muted">Será somado nas despesas, mas não afetará a média de consumo.</small>
+                </div>
             </div>`;
         modal.querySelector('.modal-footer').innerHTML = `<button class="btn btn-secondary" onclick="App.closeModal()">Cancelar</button><button class="btn btn-primary" onclick="Pages.fuelings.save(${id || 'null'})">Salvar</button>`;
         App.openModal();
+    },
+
+    toggleArlaField() {
+        const type = document.getElementById('f-tipoComb').value;
+        const container = document.getElementById('f-arla-container');
+        if (container) {
+            container.style.display = (type === 'Diesel' || type === 'Diesel S-10' || type === 'Diesel+Arla') ? 'flex' : 'none';
+        }
+        this.calcTotal();
     },
 
     async handleReceiptUpload(event) {
@@ -130,13 +146,26 @@ Pages.fuelings = {
     calcTotal() {
         const l = parseFloat(document.getElementById('f-litros').value) || 0;
         const v = parseFloat(document.getElementById('f-valorLitro').value) || 0;
-        document.getElementById('f-valorTotal').value = (l * v).toFixed(2);
+        const type = document.getElementById('f-tipoComb')?.value;
+        let arla = 0;
+        if (type !== 'Arla' && document.getElementById('f-valorArla')) {
+            arla = parseFloat(document.getElementById('f-valorArla').value) || 0;
+        }
+        document.getElementById('f-valorTotal').value = ((l * v) + arla).toFixed(2);
     },
 
     async save(id) {
         const truckId = parseInt(document.getElementById('f-truckId').value) || App.userTruckId;
         if (!truckId) { Utils.showToast('Selecione o caminhão', 'warning'); return; }
-        const data = { truckId, data: document.getElementById('f-data').value, litros: parseFloat(document.getElementById('f-litros').value) || 0, valorLitro: parseFloat(document.getElementById('f-valorLitro').value) || 0, valorTotal: parseFloat(document.getElementById('f-valorTotal').value) || 0, km: parseInt(document.getElementById('f-km').value) || 0, posto: document.getElementById('f-posto').value.trim(), tipoComb: document.getElementById('f-tipoComb').value };
+
+        let tipoComb = document.getElementById('f-tipoComb').value;
+        let valorArla = 0;
+        if (tipoComb !== 'Arla' && document.getElementById('f-valorArla')) {
+            valorArla = parseFloat(document.getElementById('f-valorArla').value) || 0;
+            if (valorArla > 0) tipoComb = tipoComb === 'Diesel S-10' ? 'Diesel S-10' : 'Diesel+Arla'; // keeps consistency with imports
+        }
+
+        const data = { truckId, data: document.getElementById('f-data').value, litros: parseFloat(document.getElementById('f-litros').value) || 0, valorLitro: parseFloat(document.getElementById('f-valorLitro').value) || 0, valorTotal: parseFloat(document.getElementById('f-valorTotal').value) || 0, valorArla, km: parseInt(document.getElementById('f-km').value) || 0, posto: document.getElementById('f-posto').value.trim(), tipoComb };
         try {
             if (id) { data.id = id; await db.update('fuelings', data); } else { await db.add('fuelings', data); }
             Utils.showToast(id ? 'Atualizado!' : 'Abastecimento registrado!', 'success');
