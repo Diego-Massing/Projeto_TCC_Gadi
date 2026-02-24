@@ -55,9 +55,9 @@ const App = {
     userTruckId: null,      // truck assigned to driver
     userAppId: null,         // app_users record id
     userEmail: null,
+    _navSetup: false,
 
     async init() {
-        if (this.initialized) return;
 
         try {
             // Check if Supabase is configured
@@ -188,6 +188,10 @@ const App = {
     },
 
     setupNavigation() {
+        // Prevent duplicate event listeners on re-init (e.g. after login)
+        if (this._navSetup) return;
+        this._navSetup = true;
+
         document.querySelectorAll('.nav-item[data-page]').forEach(item => {
             item.addEventListener('click', () => {
                 const page = item.dataset.page;
