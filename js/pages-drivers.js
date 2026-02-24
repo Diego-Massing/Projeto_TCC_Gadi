@@ -149,10 +149,8 @@ Pages.users = {
                     });
                 }
 
-                // Save the auth user ID for direct linking
-                if (signUpData?.user?.id) {
-                    data.authUserId = signUpData.user.id;
-                }
+
+
 
                 Utils.showToast('✅ Conta de acesso criada com sucesso!', 'success');
             }
