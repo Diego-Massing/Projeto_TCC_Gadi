@@ -300,7 +300,8 @@ const App = {
                 // Login
                 const { data, error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) throw error;
-                // Init handled by onAuthStateChange
+                // Re-init app to load data and navigate
+                this.init();
             }
         } catch (error) {
             msg.style.color = '#ef4444';

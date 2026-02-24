@@ -1347,12 +1347,72 @@ select.form-control {
     }
 
     .data-table {
-        font-size: 0.78rem;
+        font-size: 0.72rem;
     }
 
     .data-table th,
     .data-table td {
-        padding: 8px 10px;
+        padding: 6px 8px;
+        white-space: nowrap;
+    }
+
+    .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        margin: 0 -16px;
+        padding: 0 16px;
+    }
+
+    .data-table {
+        min-width: 700px;
+    }
+
+    .data-table .btn-icon {
+        width: 28px;
+        height: 28px;
+        font-size: 0.7rem;
+    }
+
+    .table-footer {
+        flex-direction: column;
+        gap: 4px;
+        font-size: 0.75rem;
+    }
+
+    .page-header-row {
+        gap: 8px;
+    }
+
+    .page-header-row .btn {
+        font-size: 0.75rem;
+        padding: 6px 12px;
+    }
+
+    .filter-bar {
+        gap: 8px;
+    }
+
+    .filter-bar .form-group {
+        min-width: 0;
+    }
+
+    .filter-bar .form-control {
+        font-size: 0.78rem;
+        padding: 6px 10px;
+    }
+
+    .modal {
+        width: 95vw;
+        max-height: 90vh;
+    }
+
+    .modal-body {
+        padding: 14px;
+    }
+
+    .badge {
+        font-size: 0.65rem;
+        padding: 2px 6px;
     }
 }
 
