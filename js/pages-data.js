@@ -849,13 +849,15 @@ Pages.truckExpenses = {
 
         try {
             if (id) { data.id = id; await db.update('truckExpenses', data); } else { await db.add('truckExpenses', data); }
-            Utils.showToast('Despesa salva!', 'success'); App.closeModal(); this.applyFilter();
+            Utils.showToast('Despesa salva!', 'success'); App.closeModal();
+            if (document.getElementById('filter-te-truck')) this.applyFilter(); else App.refreshCurrentPage();
         } catch (e) { Utils.showToast('Erro ao salvar', 'error'); }
     },
 
     async remove(id) {
         if (!confirm('Excluir esta despesa?')) return;
-        await db.delete('truckExpenses', id); Utils.showToast('Excluído', 'success'); this.applyFilter();
+        await db.delete('truckExpenses', id); Utils.showToast('Excluído', 'success');
+        if (document.getElementById('filter-te-truck')) this.applyFilter(); else App.refreshCurrentPage();
     },
 
     async exportCSV() {
