@@ -227,7 +227,7 @@ Pages.freights = {
                     <button class="btn btn-sm" style="background:#fff;color:var(--accent-danger);font-weight:700" onclick="Pages.freights.deleteSelected()">🗑️ Excluir Selecionados</button>
                 </div>
             </div>
-            <div class="table-container"><table class="data-table"><thead><tr><th style="width:36px"><input type="checkbox" id="select-all-freights" onchange="Pages.freights.toggleAllFreights(this.checked)" title="Selecionar todos"></th><th>Placa</th><th>Data</th><th>Origem</th><th>Destino</th><th>KM</th><th>Tipo</th><th>Modalidade</th><th>R$/KM</th><th>Valor Frete</th><th>Cliente</th><th></th></tr></thead><tbody>${freights.map(f => {
+            <div class="table-container"><table class="data-table"><thead><tr><th style="width:36px"><input type="checkbox" id="select-all-freights" onchange="Pages.freights.toggleAllFreights(this.checked)" title="Selecionar todos"></th><th>Placa</th><th>Data</th><th>Origem</th><th>Destino</th><th>KM</th><th>Tipo</th><th>Modalidade</th><th>R$/KM</th><th>Valor Frete</th><th>Recebimento</th><th>Cliente</th><th></th></tr></thead><tbody>${freights.map(f => {
             const t = trucks.find(tt => tt.id === f.truckId);
             const mod = f.modalidade || 'kmSistema';
             return `<tr>
@@ -236,7 +236,9 @@ Pages.freights = {
                 <td>${Utils.formatNumber(f.km)}</td><td><span class="badge ${f.tipo === 'carregado' ? 'badge-success' : 'badge-warning'}">${f.tipo || '—'}</span></td>
                 <td><span class="badge ${modalColors[mod] || 'badge-info'}" style="font-size:0.68rem">${modalLabels[mod] || mod}</span></td>
                 <td>${mod === 'fechado' ? `<span class="text-muted" style="font-size:0.75rem">${Utils.formatCurrency(f.taxaKmEfetiva || f.taxaKm)}</span>` : Utils.formatCurrency(f.taxaKm)}</td>
-                <td class="font-bold text-success">${Utils.formatCurrency(f.valorFrete)}</td><td>${f.cliente || '—'}</td>
+                <td class="font-bold text-success">${Utils.formatCurrency(f.valorFrete)}</td>
+                <td>${this.getPaymentBadges(f)}</td>
+                <td>${f.cliente || '—'}</td>
                 <td>${App.userRole !== 'visualizador' ? `<button class="btn btn-icon btn-secondary btn-sm" onclick="Pages.freights.showForm(${f.id})">✏️</button> <button class="btn btn-icon btn-sm" style="color:var(--accent-danger)" onclick="Pages.freights.remove(${f.id})">🗑️</button>` : ''}</td>
             </tr>`;
         }).join('')}</tbody></table></div>
@@ -361,13 +363,35 @@ Pages.freights = {
                 <div class="form-group"><label class="form-label">Nota Fiscal</label><input type="text" class="form-control" id="f-notaFiscal" value="${item?.notaFiscal || ''}"></div>
             </div>
             <div class="form-group"><label class="form-label">Observações</label><input type="text" class="form-control" id="f-obs" value="${item?.obs || ''}"></div>
-            <div id="maps-result" style="margin-top:8px"></div>`;
+            <div id="maps-result" style="margin-top:8px"></div>
+            <hr style="border-color:#333;margin:16px 0">
+            <div style="padding:12px;background:var(--bg-primary);border-radius:var(--radius-md)">
+                <label class="form-label" style="font-weight:700;color:var(--accent-info)">💰 Pagamento</label>
+                <select class="form-control" id="f-pagamentoTipo" onchange="Pages.freights.onPagamentoChange()" style="font-weight:600">
+                    <option value="integral" ${(item?.pagamentoTipo || 'integral') === 'integral' ? 'selected' : ''}>💵 Valor Integral</option>
+                    <option value="porcentagem" ${item?.pagamentoTipo === 'porcentagem' ? 'selected' : ''}>📊 Dividir por Porcentagem</option>
+                    <option value="valorFixo" ${item?.pagamentoTipo === 'valorFixo' ? 'selected' : ''}>✂️ Dividir por Valor Fixo</option>
+                </select>
+                <div id="pagamento-split" style="display:none;margin-top:10px">
+                    <div class="form-row" id="pct-row" style="display:none">
+                        <div class="form-group"><label class="form-label">% Adiantamento</label><input type="number" step="0.1" class="form-control" id="f-pctAdiantamento" value="${item?.pctAdiantamento || 50}" oninput="Pages.freights.calcPagamento()" min="0" max="100"></div>
+                    </div>
+                    <div class="form-row" id="fixed-row" style="display:none">
+                        <div class="form-group"><label class="form-label">Valor Adiantamento</label><input type="number" step="0.01" class="form-control" id="f-adiantamentoFixo" value="${item?.adiantamento || ''}" oninput="Pages.freights.calcPagamento()" placeholder="R$"></div>
+                    </div>
+                    <div class="form-row" style="margin-top:8px">
+                        <div class="form-group"><label class="form-label">Adiantamento</label><input type="number" step="0.01" class="form-control" id="f-adiantamento" value="${item?.adiantamento || ''}" readonly style="font-weight:700;color:var(--accent-warning)"></div>
+                        <div class="form-group"><label class="form-label">Saldo</label><input type="number" step="0.01" class="form-control" id="f-saldo" value="${item?.saldo || ''}" readonly style="font-weight:700;color:var(--accent-success)"></div>
+                    </div>
+                </div>
+            </div>`;
         modal.querySelector('.modal-footer').innerHTML = `<button class="btn btn-secondary" onclick="App.closeModal()">Cancelar</button><button class="btn btn-primary" onclick="Pages.freights.save(${id || 'null'})">Salvar</button>`;
         App.openModal();
         // Initialize
         setTimeout(() => {
             this.onModalidadeChange();
             this.calcFrete();
+            this.onPagamentoChange();
         }, 100);
     },
 
@@ -444,6 +468,7 @@ Pages.freights = {
         if (mod === 'fechado') {
             this.updateTaxaEfetiva();
         }
+        this.calcPagamento();
     },
 
     updateTaxaEfetiva() {
@@ -480,6 +505,17 @@ Pages.freights = {
         const taxaKm = parseFloat(document.getElementById('f-taxaKm').value) || 0;
         const taxaKmEfetiva = mod === 'fechado' && km > 0 ? parseFloat((valorFrete / km).toFixed(4)) : taxaKm;
 
+        const pagamentoTipo = document.getElementById('f-pagamentoTipo')?.value || 'integral';
+        let adiantamento = 0, saldo = 0, pctAdiantamento = null;
+        if (pagamentoTipo === 'porcentagem') {
+            pctAdiantamento = parseFloat(document.getElementById('f-pctAdiantamento')?.value) || 0;
+            adiantamento = parseFloat((valorFrete * pctAdiantamento / 100).toFixed(2));
+            saldo = parseFloat((valorFrete - adiantamento).toFixed(2));
+        } else if (pagamentoTipo === 'valorFixo') {
+            adiantamento = parseFloat(document.getElementById('f-adiantamentoFixo')?.value) || 0;
+            saldo = parseFloat((valorFrete - adiantamento).toFixed(2));
+        }
+
         const data = {
             truckId,
             data: document.getElementById('f-data').value,
@@ -493,8 +529,21 @@ Pages.freights = {
             comissaoFechado: mod === 'fechado' ? (parseFloat(document.getElementById('f-comissaoFechado').value) || 0) : 0,
             cliente: document.getElementById('f-cliente').value.trim(),
             notaFiscal: document.getElementById('f-notaFiscal').value.trim(),
-            obs: document.getElementById('f-obs').value.trim()
+            obs: document.getElementById('f-obs').value.trim(),
+            pagamentoTipo,
+            pctAdiantamento,
+            adiantamento,
+            saldo
         };
+        // Preserve payment status when editing
+        if (id) {
+            const existing = await db.getById('freights', id);
+            if (existing) {
+                data.adiantamentoRecebido = existing.adiantamentoRecebido || false;
+                data.saldoRecebido = existing.saldoRecebido || false;
+                data.recebido = existing.recebido || false;
+            }
+        }
         try {
             if (id) { data.id = id; await db.update('freights', data); } else { await db.add('freights', data); }
             Utils.showToast(id ? 'Frete atualizado!' : 'Frete registrado!', 'success'); App.closeModal(); App.refreshCurrentPage();
@@ -502,6 +551,69 @@ Pages.freights = {
     },
 
     async remove(id) { if (!confirm('Excluir?')) return; await db.delete('freights', id); Utils.showToast('Excluído', 'success'); App.refreshCurrentPage(); },
+
+    async exportCSV() {
+        const freights = await db.getAll('freights');
+        const trucks = await db.getAll('trucks');
+        Utils.exportToCSV(freights.map(f => { const t = trucks.find(tt => tt.id === f.truckId); return { Placa: t?.placa || '', Data: Utils.formatDate(f.data), Origem: f.origem, Destino: f.destino, KM: f.km, Tipo: f.tipo, Modalidade: f.modalidade || 'kmSistema', TaxaKM: f.taxaKm, TaxaEfetiva: f.taxaKmEfetiva || '', ValorFrete: f.valorFrete, Cliente: f.cliente, NF: f.notaFiscal }; }), 'fretes.csv');
+    },
+
+    onPagamentoChange() {
+        const tipo = document.getElementById('f-pagamentoTipo')?.value;
+        const splitDiv = document.getElementById('pagamento-split');
+        const pctRow = document.getElementById('pct-row');
+        const fixedRow = document.getElementById('fixed-row');
+        if (!splitDiv) return;
+        if (tipo === 'integral') {
+            splitDiv.style.display = 'none';
+        } else {
+            splitDiv.style.display = 'block';
+            pctRow.style.display = tipo === 'porcentagem' ? 'flex' : 'none';
+            fixedRow.style.display = tipo === 'valorFixo' ? 'flex' : 'none';
+            this.calcPagamento();
+        }
+    },
+
+    calcPagamento() {
+        const tipo = document.getElementById('f-pagamentoTipo')?.value;
+        const valorFrete = parseFloat(document.getElementById('f-valorFrete')?.value) || 0;
+        let adiantamento = 0;
+        if (tipo === 'porcentagem') {
+            const pct = parseFloat(document.getElementById('f-pctAdiantamento')?.value) || 0;
+            adiantamento = parseFloat((valorFrete * pct / 100).toFixed(2));
+        } else if (tipo === 'valorFixo') {
+            adiantamento = parseFloat(document.getElementById('f-adiantamentoFixo')?.value) || 0;
+        }
+        const saldo = parseFloat((valorFrete - adiantamento).toFixed(2));
+        const adEl = document.getElementById('f-adiantamento');
+        const salEl = document.getElementById('f-saldo');
+        if (adEl) adEl.value = adiantamento.toFixed(2);
+        if (salEl) salEl.value = saldo.toFixed(2);
+    },
+
+    async toggleRecebido(id, campo) {
+        try {
+            const freight = await db.getById('freights', id);
+            if (!freight) return;
+            freight[campo] = !freight[campo];
+            await db.update('freights', freight);
+            App.refreshCurrentPage();
+        } catch (e) { console.error('toggleRecebido error:', e); }
+    },
+
+    getPaymentBadges(f) {
+        const tipo = f.pagamentoTipo || 'integral';
+        if (tipo === 'integral') {
+            const recebido = f.recebido || false;
+            return `<button class="btn btn-sm" style="font-size:0.7rem;padding:2px 8px;background:${recebido ? 'var(--accent-success)' : 'var(--bg-tertiary)'};color:${recebido ? '#fff' : 'var(--text-secondary)'};border:none;border-radius:4px;cursor:pointer" onclick="event.stopPropagation();Pages.freights.toggleRecebido(${f.id},'recebido')" title="${recebido ? 'Recebido' : 'Não recebido'}">${recebido ? '✅' : '⬜'} ${Utils.formatCurrency(f.valorFrete)}</button>`;
+        }
+        const adRecebido = f.adiantamentoRecebido || false;
+        const salRecebido = f.saldoRecebido || false;
+        return `<div style="display:flex;flex-direction:column;gap:3px">
+            <button class="btn btn-sm" style="font-size:0.65rem;padding:2px 6px;background:${adRecebido ? 'var(--accent-warning)' : 'var(--bg-tertiary)'};color:${adRecebido ? '#fff' : 'var(--text-secondary)'};border:none;border-radius:4px;cursor:pointer" onclick="event.stopPropagation();Pages.freights.toggleRecebido(${f.id},'adiantamentoRecebido')" title="Adiantamento">${adRecebido ? '✅' : '⬜'} Ad. ${Utils.formatCurrency(f.adiantamento || 0)}</button>
+            <button class="btn btn-sm" style="font-size:0.65rem;padding:2px 6px;background:${salRecebido ? 'var(--accent-success)' : 'var(--bg-tertiary)'};color:${salRecebido ? '#fff' : 'var(--text-secondary)'};border:none;border-radius:4px;cursor:pointer" onclick="event.stopPropagation();Pages.freights.toggleRecebido(${f.id},'saldoRecebido')" title="Saldo">${salRecebido ? '✅' : '⬜'} Sal. ${Utils.formatCurrency(f.saldo || 0)}</button>
+        </div>`;
+    },
 
     async exportCSV() {
         const freights = await db.getAll('freights');

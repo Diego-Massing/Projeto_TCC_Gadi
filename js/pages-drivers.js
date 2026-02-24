@@ -125,18 +125,36 @@ Pages.users = {
         if (role !== 'motorista') { data.truckId = null; data.salarioFixo = 0; data.comKmCarregado = null; data.comKmVazio = null; }
 
         try {
-            // If temLogin is true and this is a NEW user, create auth account first
+            // If temLogin is true and this is a NEW user, create auth account via signUp
             if (temLogin && !id && authEmail && authPassword) {
-                const { data: authData, error: authError } = await supabase.auth.admin?.createUser?.({
+                // Store current session so we can restore it after signUp
+                const { data: currentSession } = await supabase.auth.getSession();
+
+                const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
                     email: authEmail,
-                    password: authPassword,
-                    email_confirm: true
+                    password: authPassword
                 });
-                // If admin API is not available, use signUp (user will get confirmation email)
-                if (authError || !authData) {
-                    console.log('Admin API not available, skipping auth account creation. User can register themselves.');
-                    // Don't block - just save without auth account
+
+                if (signUpError) {
+                    Utils.showToast('Erro ao criar conta: ' + signUpError.message, 'error');
+                    return;
                 }
+
+                // signUp may auto-login the new user, which would log out the admin
+                // Restore admin session if that happened
+                if (currentSession?.session) {
+                    await supabase.auth.setSession({
+                        access_token: currentSession.session.access_token,
+                        refresh_token: currentSession.session.refresh_token
+                    });
+                }
+
+                // Save the auth user ID for direct linking
+                if (signUpData?.user?.id) {
+                    data.authUserId = signUpData.user.id;
+                }
+
+                Utils.showToast('✅ Conta de acesso criada com sucesso!', 'success');
             }
 
             if (id) { data.id = id; await db.update('users', data); Utils.showToast('Usuário atualizado!', 'success'); }
