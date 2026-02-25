@@ -12,7 +12,9 @@ Pages.truckDetail = {
             fuelings: await db.getFuelingsByTruck(id),
             freights: await db.getFreightsByTruck(id),
             fines: await db.getFinesByTruck(id),
-            expenses: await db.getByIndex('truckExpenses', 'truckId', id)
+            expenses: await db.getByIndex('truckExpenses', 'truckId', id),
+            maintenance: await db.getByIndex('maintenancePlans', 'truckId', id),
+            tires: await db.getByIndex('tires', 'truckId', id)
         };
 
         const { mes, ano } = Utils.getCurrentMonth();
@@ -65,12 +67,20 @@ Pages.truckDetail = {
                 </div>
                 <div class="tabs">
                     <button class="tab-btn active" onclick="Pages.truckDetail.showTab('fuel',this)">\u26fd Abast.</button>
+                    ${App.userRole !== 'motorista' ? `
+                    <button class="tab-btn" onclick="Pages.truckDetail.showTab('maintenance',this)">🔧 Manutenções</button>
+                    <button class="tab-btn" onclick="Pages.truckDetail.showTab('tires',this)">🛞 Pneus</button>
+                    ` : ''}
                     <button class="tab-btn" onclick="Pages.truckDetail.showTab('freight',this)">\ud83d\udce6 Fretes</button>
                     <button class="tab-btn" onclick="Pages.truckDetail.showTab('expenses',this)">\ud83d\udcb8 Despesas</button>
                     <button class="tab-btn" onclick="Pages.truckDetail.showTab('fines',this)">\ud83d\udea8 Multas</button>
                     <button class="tab-btn" onclick="Pages.truckDetail.showTab('closing',this)">\ud83d\udcca Fechamento</button>
                 </div>
                 <div id="tab-fuel" class="tab-content active">${this.renderFuelTab(fFuel)}</div>
+                ${App.userRole !== 'motorista' ? `
+                <div id="tab-maintenance" class="tab-content">${this.renderMaintenanceTab(this._truckData.maintenance, truck)}</div>
+                <div id="tab-tires" class="tab-content">${this.renderTiresTab(this._truckData.tires)}</div>
+                ` : ''}
                 <div id="tab-freight" class="tab-content">${this.renderFreightTab(fFreight)}</div>
                 <div id="tab-expenses" class="tab-content">${this.renderExpensesTab(fExpenses)}</div>
                 <div id="tab-fines" class="tab-content">${this.renderFinesTab(fFines)}</div>
@@ -127,6 +137,99 @@ Pages.truckDetail = {
                 <td><span class="badge ${f.status === 'paga' ? 'badge-success' : f.status === 'recorrida' ? 'badge-info' : 'badge-danger'}">${f.status || 'pendente'}</span></td>
                 <td><button class="btn btn-icon btn-secondary btn-sm" onclick="Pages.fines.showForm(${f.id},${f.truckId})">✏️</button> <button class="btn btn-icon btn-sm" style="color:var(--accent-danger)" onclick="Pages.fines.remove(${f.id})">🗑️</button></td>
             </tr>`).join('')}</tbody></table></div>`}`;
+    },
+
+    renderMaintenanceTab(plans, truck) {
+        const truckKm = truck.kmAtual || 0;
+        return `<div class="d-flex justify-between align-center mb-2">
+            <h3>Manutenções Preventivas (Base KM)</h3>
+            <button class="btn btn-primary btn-sm" onclick="Pages.truckDetail.showMaintenanceForm(null)">＋ Novo Plano</button>
+        </div>
+        ${(!plans || plans.length === 0) ? '<div class="empty-state"><div class="empty-icon">🔧</div><h3>Nenhum plano cadastrado</h3></div>' :
+                `<div class="trucks-grid animate-in" style="margin-top:16px">${plans.map(p => {
+                    const nextKm = p.lastKm + p.kmInterval;
+                    const diff = nextKm - truckKm;
+                    const progress = Math.min(100, Math.max(0, ((truckKm - p.lastKm) / p.kmInterval) * 100));
+                    const statusColor = progress > 100 ? 'var(--accent-danger)' : (progress > 90 ? 'var(--accent-warning)' : 'var(--accent-success)');
+                    return `<div class="truck-card">
+                <div style="display:flex;justify-content:space-between;align-items:start">
+                    <h4 style="font-size:1.1rem;margin:0">${p.item}</h4>
+                    <span class="badge" style="background:${statusColor};color:#fff">${diff < 0 ? 'Vencido' : 'OK'}</span>
+                </div>
+                <div class="text-muted" style="font-size:0.8rem;margin:8px 0">Última troca: ${p.lastKm} KM | Trocado a cada ${p.kmInterval} KM</div>
+                <div style="width:100%;height:8px;background:var(--bg-input);border-radius:4px;margin-bottom:8px;overflow:hidden">
+                    <div style="height:100%;width:${progress}%;background:${statusColor};transition:width 0.3s"></div>
+                </div>
+                <div style="font-size:0.85rem;font-weight:600;display:flex;justify-content:space-between">
+                    <span style="color:${statusColor}">${diff < 0 ? `Passou ${Math.abs(diff)} KM` : `Faltam ${diff} KM`}</span>
+                    <span>Trocar em: ${nextKm} KM</span>
+                </div>
+                <div class="truck-actions" style="margin-top:16px">
+                    <button class="btn btn-sm btn-primary flex-1" onclick="Pages.truckDetail.registerMaintenanceSwap(${p.id})">✅ Registrar Troca</button>
+                    <button class="btn btn-sm btn-secondary" onclick="Pages.truckDetail.showMaintenanceForm(${p.id})">✏️</button>
+                    <button class="btn btn-sm btn-danger" onclick="Pages.truckDetail.deleteMaintenance(${p.id})">🗑️</button>
+                </div>
+            </div>`;
+                }).join('')}</div>`}`;
+    },
+
+    renderTiresTab(tires) {
+        return `<div class="d-flex justify-between align-center mb-2">
+            <h3>Controle de Pneus</h3>
+            <span class="text-muted" style="font-size:0.85rem">Clique na posição para gerenciar.</span>
+        </div>
+        <div style="background:var(--bg-secondary);padding:24px;border-radius:12px;margin-top:16px;display:flex;flex-direction:column;align-items:center;gap:30px">
+            
+            <!-- Eixo Direcional (1) -->
+            <div style="display:flex;justify-content:center;gap:120px;position:relative;width:100%">
+                <div style="position:absolute;left:50%;top:0;bottom:-40px;width:12px;background:#334155;transform:translateX(-50%);z-index:1;border-radius:6px"></div>
+                <div style="position:absolute;left:50%;top:50%;width:80px;height:6px;background:#334155;transform:translate(-50%,-50%);z-index:0"></div>
+                ${this.renderTireSlot(tires, 1, 'LE')}
+                ${this.renderTireSlot(tires, 1, 'LD')}
+            </div>
+
+            <!-- Eixo Tração (2) -->
+            <div style="display:flex;justify-content:center;gap:80px;position:relative;width:100%">
+                <div style="position:absolute;left:50%;top:0;bottom:-40px;width:12px;background:#334155;transform:translateX(-50%);z-index:1"></div>
+                <!-- Eixo horizontal longo -->
+                <div style="position:absolute;left:50%;top:50%;width:160px;height:6px;background:#334155;transform:translate(-50%,-50%);z-index:0"></div>
+                
+                <div style="display:flex;gap:4px">
+                    ${this.renderTireSlot(tires, 2, 'LE')}
+                    ${this.renderTireSlot(tires, 2, 'LI')}
+                </div>
+                <div style="display:flex;gap:4px">
+                    ${this.renderTireSlot(tires, 2, 'RI')}
+                    ${this.renderTireSlot(tires, 2, 'RD')}
+                </div>
+            </div>
+
+            <!-- Eixo Truck (3) -->
+            <div style="display:flex;justify-content:center;gap:80px;position:relative;width:100%">
+                <div style="position:absolute;left:50%;top:0;bottom:0px;width:12px;background:#334155;transform:translateX(-50%);z-index:1;border-radius:0 0 6px 6px"></div>
+                <div style="position:absolute;left:50%;top:50%;width:160px;height:6px;background:#334155;transform:translate(-50%,-50%);z-index:0"></div>
+                
+                <div style="display:flex;gap:4px">
+                    ${this.renderTireSlot(tires, 3, 'LE')}
+                    ${this.renderTireSlot(tires, 3, 'LI')}
+                </div>
+                <div style="display:flex;gap:4px">
+                    ${this.renderTireSlot(tires, 3, 'RI')}
+                    ${this.renderTireSlot(tires, 3, 'RD')}
+                </div>
+            </div>
+
+        </div>`;
+    },
+
+    renderTireSlot(tires, eixo, posicao) {
+        const tire = (tires || []).find(t => t.eixo === eixo && t.posicao === posicao);
+        const hasTire = !!tire;
+        const color = hasTire ? (tire.status === 'Novo' ? 'var(--accent-success)' : 'var(--accent-info)') : 'var(--border-color)';
+
+        return `<div onclick="Pages.truckDetail.showTireForm(${this.truckId}, ${eixo}, '${posicao}', ${tire?.id || 'null'})" style="width:40px;height:80px;background:var(--bg-card);border:2px solid ${color};border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative;z-index:2;box-shadow:inset 0 0 10px rgba(0,0,0,0.5)">
+            <div style="font-size:0.6rem;color:var(--text-muted);writing-mode:vertical-rl;text-orientation:mixed">${hasTire ? tire.fogo : 'VAZIO'}</div>
+        </div>`;
     },
 
     renderClosingTab() {
@@ -230,5 +333,134 @@ Pages.truckDetail = {
         const mediaEl = document.getElementById('truck-closing-media');
         if (litrosEl) litrosEl.textContent = Utils.formatNumber(litrosRange, 1);
         if (mediaEl) mediaEl.textContent = media.toFixed(2);
+    },
+
+    // ===== MAINTENANCE LOGIC =====
+    async showMaintenanceForm(id) {
+        let plan = null;
+        if (id) plan = this._truckData.maintenance.find(p => p.id === id);
+
+        const modal = document.getElementById('modal-overlay');
+        modal.querySelector('.modal-header h2').textContent = id ? 'Editar Plano' : 'Novo Plano de Manutenção';
+        modal.querySelector('.modal-body').innerHTML = `
+            <div class="form-group">
+                <label class="form-label">Item / Serviço *</label>
+                <input type="text" class="form-control" id="mp-item" value="${plan?.item || ''}" placeholder="Ex: Óleo de Motor, Filtros, Lonas">
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Intervalo de Troca (KM) *</label>
+                    <input type="number" class="form-control" id="mp-interval" value="${plan?.kmInterval || ''}" placeholder="Ex: 40000">
+                </div>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">Última Troca (KM) *</label>
+                    <input type="number" class="form-control" id="mp-last" value="${plan?.lastKm || this._truckData.truck.kmAtual || 0}">
+                </div>
+            </div>`;
+        modal.querySelector('.modal-footer').innerHTML = `<button class="btn btn-secondary" onclick="App.closeModal()">Cancelar</button><button class="btn btn-primary" onclick="Pages.truckDetail.saveMaintenance(${id || 'null'})">Salvar</button>`;
+        App.openModal();
+    },
+
+    async saveMaintenance(id) {
+        const data = {
+            truckId: this.truckId,
+            item: document.getElementById('mp-item').value.trim(),
+            kmInterval: parseInt(document.getElementById('mp-interval').value),
+            lastKm: parseInt(document.getElementById('mp-last').value)
+        };
+        if (!data.item || !data.kmInterval) { Utils.showToast('Preencha os campos obrigatórios', 'warning'); return; }
+
+        try {
+            if (id) { data.id = id; await db.update('maintenancePlans', data); }
+            else { await db.add('maintenancePlans', data); }
+            Utils.showToast('Plano salvo!', 'success');
+            App.closeModal();
+            this.render(this.truckId);
+            setTimeout(() => this.showTab('maintenance', document.querySelectorAll('.tab-btn')[1]), 200);
+        } catch (e) { Utils.showToast('Erro ao salvar plano', 'error'); }
+    },
+
+    async registerMaintenanceSwap(id) {
+        const truckKm = this._truckData.truck.kmAtual || 0;
+        if (!confirm(`Confirmar que a troca foi realizada no KM atual do caminhão (${truckKm})?`)) return;
+        try {
+            const plan = this._truckData.maintenance.find(p => p.id === id);
+            plan.lastKm = truckKm;
+            plan.lastDate = new Date().toISOString().split('T')[0];
+            await db.update('maintenancePlans', plan);
+            Utils.showToast('Troca registrada!', 'success');
+            this.render(this.truckId);
+            setTimeout(() => this.showTab('maintenance', document.querySelectorAll('.tab-btn')[1]), 200);
+        } catch (e) { Utils.showToast('Erro ao registrar', 'error'); }
+    },
+
+    async deleteMaintenance(id) {
+        if (!confirm('Excluir este plano de manutenção?')) return;
+        await db.delete('maintenancePlans', id);
+        this.render(this.truckId);
+        setTimeout(() => this.showTab('maintenance', document.querySelectorAll('.tab-btn')[1]), 200);
+    },
+
+    // ===== TIRES LOGIC =====
+    async showTireForm(truckId, eixo, posicao, id) {
+        let tire = null;
+        if (id) tire = this._truckData.tires.find(t => t.id === id);
+
+        const modal = document.getElementById('modal-overlay');
+        modal.querySelector('.modal-header h2').textContent = id ? 'Editar Pneu' : 'Novo Pneu';
+        modal.querySelector('.modal-body').innerHTML = `
+            <div class="form-row">
+                <div class="form-group" style="flex:1"><label class="form-label">Eixo</label><input type="text" class="form-control" value="${eixo}" disabled></div>
+                <div class="form-group" style="flex:1"><label class="form-label">Posição</label><input type="text" class="form-control" value="${posicao}" disabled></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1"><label class="form-label">Fogo do Pneu *</label><input type="text" class="form-control" id="tr-fogo" value="${tire?.fogo || ''}" style="text-transform:uppercase"></div>
+                <div class="form-group" style="flex:1"><label class="form-label">Marca</label><input type="text" class="form-control" id="tr-marca" value="${tire?.marca || ''}"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1"><label class="form-label">KM de Instalação</label><input type="number" class="form-control" id="tr-km" value="${tire?.kmInstalacao || this._truckData.truck.kmAtual || 0}"></div>
+                <div class="form-group" style="flex:1"><label class="form-label">Status</label><select class="form-control" id="tr-status">
+                    <option value="Novo" ${tire?.status === 'Novo' ? 'selected' : ''}>Novo</option>
+                    <option value="Recapagem 1" ${tire?.status === 'Recapagem 1' ? 'selected' : ''}>Recapagem 1</option>
+                    <option value="Recapagem 2" ${tire?.status === 'Recapagem 2' ? 'selected' : ''}>Recapagem 2</option>
+                    <option value="Recapagem 3" ${tire?.status === 'Recapagem 3' ? 'selected' : ''}>Recapagem 3</option>
+                </select></div>
+            </div>
+            ${id ? `<div style="margin-top:16px;text-align:right"><button class="btn btn-sm btn-danger" onclick="Pages.truckDetail.removeTire(${id})">🗑️ Remover Pneu (Desmontar)</button></div>` : ''}`;
+
+        modal.querySelector('.modal-footer').innerHTML = `<button class="btn btn-secondary" onclick="App.closeModal()">Cancelar</button><button class="btn btn-primary" onclick="Pages.truckDetail.saveTire(${truckId}, ${eixo}, '${posicao}', ${id || 'null'})">Salvar</button>`;
+        App.openModal();
+    },
+
+    async saveTire(truckId, eixo, posicao, id) {
+        const fogo = document.getElementById('tr-fogo').value.trim().toUpperCase();
+        if (!fogo) { Utils.showToast('Informe o número de fogo do pneu.', 'warning'); return; }
+
+        const data = {
+            truckId, eixo, posicao, fogo,
+            marca: document.getElementById('tr-marca').value.trim() || null,
+            kmInstalacao: parseInt(document.getElementById('tr-km').value) || 0,
+            status: document.getElementById('tr-status').value
+        };
+
+        try {
+            if (id) { data.id = id; await db.update('tires', data); }
+            else { await db.add('tires', data); }
+            Utils.showToast('Pneu montado!', 'success');
+            App.closeModal();
+            this.render(this.truckId);
+            setTimeout(() => this.showTab('tires', document.querySelectorAll('.tab-btn')[2]), 200);
+        } catch (e) { Utils.showToast('Erro ao salvar pneu', 'error'); }
+    },
+
+    async removeTire(id) {
+        if (!confirm('Deseja desmontar/remover este pneu?')) return;
+        try {
+            await db.delete('tires', id);
+            Utils.showToast('Pneu desmontado!', 'success');
+            App.closeModal();
+            this.render(this.truckId);
+            setTimeout(() => this.showTab('tires', document.querySelectorAll('.tab-btn')[2]), 200);
+        } catch (e) { Utils.showToast('Erro ao remover pneu', 'error'); }
     }
 };

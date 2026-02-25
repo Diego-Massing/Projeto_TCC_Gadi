@@ -10,9 +10,10 @@ Pages.dashboard = {
         const freights = await db.getAll('freights');
         const fines = await db.getAll('fines');
         const truckExpenses = await db.getAll('truckExpenses');
+        const maintenancePlans = await db.getAll('maintenancePlans');
         const { mes, ano } = Utils.getCurrentMonth();
 
-        this._allData = { trucks, fuelings, freights, fines, truckExpenses };
+        this._allData = { trucks, fuelings, freights, fines, truckExpenses, maintenancePlans };
 
         document.getElementById('page-content').innerHTML = `
             <div class="page-header">
@@ -29,6 +30,7 @@ Pages.dashboard = {
                     <div class="form-group"><label class="form-label">M\u00eas</label><select class="form-control" id="dash-mes" onchange="Pages.dashboard.applyDashboardFilter()">${Array.from({ length: 12 }, (_, i) => '<option value="' + (i + 1) + '"' + (i + 1 === mes ? ' selected' : '') + '>' + Utils.getMonthName(i + 1) + '</option>').join('')}</select></div>
                     <div class="form-group"><label class="form-label">Ano</label><input type="number" class="form-control" id="dash-ano" value="${ano}" style="width:100px" onchange="Pages.dashboard.applyDashboardFilter()"></div>
                 </div>
+                <div id="dash-alerts"></div>
                 <div id="dash-content"></div>
             </div>`;
 
@@ -36,7 +38,7 @@ Pages.dashboard = {
     },
 
     applyDashboardFilter() {
-        const { trucks, fuelings, freights, fines, truckExpenses } = this._allData;
+        const { trucks, fuelings, freights, fines, truckExpenses, maintenancePlans } = this._allData;
         const truckId = document.getElementById('dash-truck').value;
         const mes = parseInt(document.getElementById('dash-mes').value);
         const ano = parseInt(document.getElementById('dash-ano').value);
@@ -53,6 +55,9 @@ Pages.dashboard = {
             fFines = fFines.filter(f => f.truckId === tid);
             fExpenses = fExpenses.filter(f => f.truckId === tid);
         }
+
+        // Render Global Alerts
+        this.renderGlobalAlerts(trucks, maintenancePlans || [], truckId);
 
         const fuelMonth = fFuel.filter(f => { const d = new Date(f.data); return d.getMonth() + 1 === mes && d.getFullYear() === ano; });
         const freightMonth = fFreight.filter(f => { const d = new Date(f.data); return d.getMonth() + 1 === mes && d.getFullYear() === ano; });
@@ -99,6 +104,57 @@ Pages.dashboard = {
                 </div>`;
 
         this.drawCharts(fFuel, fFreight, fFines, fExpenses, trucks, mes, ano);
+    },
+
+    renderGlobalAlerts(trucks, plans, selectedTruckId) {
+        if (App.userRole === 'motorista') return; // Hide from drivers
+
+        let targetPlans = plans;
+        if (selectedTruckId) targetPlans = targetPlans.filter(p => p.truckId === parseInt(selectedTruckId));
+
+        const alerts = [];
+        targetPlans.forEach(p => {
+            const truck = trucks.find(t => t.id === p.truckId);
+            if (!truck) return;
+            const truckKm = truck.kmAtual || 0;
+            const nextKm = p.lastKm + p.kmInterval;
+            const diff = nextKm - truckKm;
+            const progress = ((truckKm - p.lastKm) / p.kmInterval) * 100;
+
+            if (progress >= 90) {
+                alerts.push({
+                    placa: truck.placa,
+                    truckId: truck.id,
+                    item: p.item,
+                    type: progress >= 100 ? 'danger' : 'warning',
+                    msg: progress >= 100 ? `Vencida há ${Math.abs(diff)} KM` : `Faltam ${diff} KM`
+                });
+            }
+        });
+
+        const alertsContainer = document.getElementById('dash-alerts');
+        if (alerts.length === 0) {
+            alertsContainer.innerHTML = '';
+            return;
+        }
+
+        alertsContainer.innerHTML = `
+            <div class="card mb-3" style="border:1px solid var(--accent-warning); background:rgba(245, 158, 11, 0.05)">
+                <div class="card-header"><h3 style="color:var(--accent-warning)">⚠️ Alertas de Manutenção Preventiva</h3></div>
+                <div class="card-body">
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        ${alerts.map(a => `
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; background:var(--bg-card); border-left:4px solid var(--accent-${a.type}); border-radius:4px;">
+                                <div><strong style="font-family:monospace; margin-right:8px">${a.placa}</strong> ${a.item}</div>
+                                <div style="display:flex; align-items:center; gap:12px;">
+                                    <span style="color:var(--accent-${a.type}); font-size:0.9rem; font-weight:600">${a.msg}</span>
+                                    <button class="btn btn-sm btn-secondary" onclick="App.navigate('truck-detail', ${a.truckId})">Ver Caminhão</button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>`;
     },
 
     renderFinesList(fines, trucks) {
