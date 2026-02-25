@@ -41,7 +41,8 @@ class FrotaDatabase {
                         storeName === 'driverDiscounts' ? 'driver_discounts' :
                             storeName === 'maintenancePlans' ? 'maintenance_plans' :
                                 storeName === 'tires' ? 'tires' :
-                                    storeName;
+                                    storeName === 'tiresHistory' ? 'tires_history' :
+                                        storeName;
 
         const { data: inserted, error } = await supabase
             .from(table)
@@ -65,7 +66,8 @@ class FrotaDatabase {
                         storeName === 'driverDiscounts' ? 'driver_discounts' :
                             storeName === 'maintenancePlans' ? 'maintenance_plans' :
                                 storeName === 'tires' ? 'tires' :
-                                    storeName;
+                                    storeName === 'tiresHistory' ? 'tires_history' :
+                                        storeName;
 
         const { data: updated, error } = await supabase
             .from(table)
@@ -91,7 +93,8 @@ class FrotaDatabase {
                         storeName === 'driverDiscounts' ? 'driver_discounts' :
                             storeName === 'maintenancePlans' ? 'maintenance_plans' :
                                 storeName === 'tires' ? 'tires' :
-                                    storeName;
+                                    storeName === 'tiresHistory' ? 'tires_history' :
+                                        storeName;
 
         const { error } = await supabase.from(table).delete().eq('id', id);
         if (error) { console.error(`Error deleting from ${storeName}:`, error); throw error; }
@@ -107,7 +110,8 @@ class FrotaDatabase {
                         storeName === 'driverDiscounts' ? 'driver_discounts' :
                             storeName === 'maintenancePlans' ? 'maintenance_plans' :
                                 storeName === 'tires' ? 'tires' :
-                                    storeName;
+                                    storeName === 'tiresHistory' ? 'tires_history' :
+                                        storeName;
 
         const { data, error } = await supabase.from(table).select().eq('id', id).single();
         if (error) return null; // Not found or error
@@ -129,7 +133,8 @@ class FrotaDatabase {
                         storeName === 'driverDiscounts' ? 'driver_discounts' :
                             storeName === 'maintenancePlans' ? 'maintenance_plans' :
                                 storeName === 'tires' ? 'tires' :
-                                    storeName;
+                                    storeName === 'tiresHistory' ? 'tires_history' :
+                                        storeName;
 
         const { data, error } = await supabase.from(table).select('*');
         if (error) { console.error(`Error getting all ${storeName}:`, error); return []; }
@@ -144,7 +149,8 @@ class FrotaDatabase {
                         storeName === 'driverDiscounts' ? 'driver_discounts' :
                             storeName === 'maintenancePlans' ? 'maintenance_plans' :
                                 storeName === 'tires' ? 'tires' :
-                                    storeName;
+                                    storeName === 'tiresHistory' ? 'tires_history' :
+                                        storeName;
 
         // Composite keys (simulated in IndexedDB with arrays) are tricky.
         // If indexName is array like ['truckId', 'data'], Supabase needs separate .eq() calls?
@@ -187,7 +193,10 @@ class FrotaDatabase {
                 storeName === 'driverExpenses' ? 'driver_expenses' :
                     storeName === 'driverBonuses' ? 'driver_bonuses' :
                         storeName === 'driverDiscounts' ? 'driver_discounts' :
-                            storeName;
+                            storeName === 'maintenancePlans' ? 'maintenance_plans' :
+                                storeName === 'tires' ? 'tires' :
+                                    storeName === 'tiresHistory' ? 'tires_history' :
+                                        storeName;
         const { count, error } = await supabase.from(table).select('*', { count: 'exact', head: true });
         if (error) return 0;
         return count;
@@ -200,7 +209,10 @@ class FrotaDatabase {
                 storeName === 'driverExpenses' ? 'driver_expenses' :
                     storeName === 'driverBonuses' ? 'driver_bonuses' :
                         storeName === 'driverDiscounts' ? 'driver_discounts' :
-                            storeName;
+                            storeName === 'maintenancePlans' ? 'maintenance_plans' :
+                                storeName === 'tires' ? 'tires' :
+                                    storeName === 'tiresHistory' ? 'tires_history' :
+                                        storeName;
         await supabase.from(table).delete().neq('id', 0); // Hack to delete all? neq id 0 checks all.
     }
 
@@ -210,7 +222,10 @@ class FrotaDatabase {
                 storeName === 'driverExpenses' ? 'driver_expenses' :
                     storeName === 'driverBonuses' ? 'driver_bonuses' :
                         storeName === 'driverDiscounts' ? 'driver_discounts' :
-                            storeName;
+                            storeName === 'maintenancePlans' ? 'maintenance_plans' :
+                                storeName === 'tires' ? 'tires' :
+                                    storeName === 'tiresHistory' ? 'tires_history' :
+                                        storeName;
         // Strip IDs
         const payload = items.map(i => {
             const c = { ...i };

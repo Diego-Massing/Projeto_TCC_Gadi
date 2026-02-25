@@ -454,13 +454,36 @@ Pages.truckDetail = {
     },
 
     async removeTire(id) {
-        if (!confirm('Deseja desmontar/remover este pneu?')) return;
+        const tire = this._truckData.tires.find(t => t.id === id);
+        if (!tire) return;
+
+        const motivo = prompt('Motivo da retirada (Ex: Descarte, Recapagem, Venda):');
+        if (motivo === null) return; // User cancelled
+
+        const kmAtualCaminhao = this._truckData.truck.kmAtual || 0;
+        const kmRodados = kmAtualCaminhao - (tire.kmInstalacao || 0);
+
+        if (!confirm(`Confirmar desmontagem?\n\nKM Rodados nesta vida: ${kmRodados}\nMotivo: ${motivo || 'Nenhum'}`)) return;
+
         try {
+            await db.add('tiresHistory', {
+                truckId: tire.truckId,
+                posicaoOriginal: tire.posicao,
+                eixoOriginal: tire.eixo,
+                fogo: tire.fogo,
+                marca: tire.marca,
+                kmInstalacao: tire.kmInstalacao,
+                kmRetirada: kmAtualCaminhao,
+                kmRodados: kmRodados,
+                statusNaRetirada: tire.status,
+                motivo: motivo
+            });
+
             await db.delete('tires', id);
-            Utils.showToast('Pneu desmontado!', 'success');
+            Utils.showToast('Pneu arquivado e desmontado!', 'success');
             App.closeModal();
             this.render(this.truckId);
             setTimeout(() => this.showTab('tires', document.querySelectorAll('.tab-btn')[2]), 200);
-        } catch (e) { Utils.showToast('Erro ao remover pneu', 'error'); }
+        } catch (e) { Utils.showToast('Erro ao arquivar pneu', 'error'); }
     }
 };

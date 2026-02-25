@@ -1,3 +1,107 @@
+// ===== TIRES ANALYTICS PAGE =====
+Pages.tiresAnalytics = {
+    async render() {
+        const history = await db.getAll('tiresHistory');
+        const trucks = await db.getAll('trucks');
+
+        // Descending sort by retrieved date
+        history.sort((a, b) => b.created_at?.localeCompare(a.created_at));
+
+        document.getElementById('page-content').innerHTML = `
+            <div class="page-header"><div class="page-header-row">
+                <div><h1 class="page-title">🛞 Histórico de Pneus</h1><p class="page-subtitle">Desempenho e vida útil calculada de pneus retirados</p></div>
+            </div></div>
+            <div class="page-body">
+                <div class="filter-bar">
+                    <div class="form-group"><label class="form-label">Placa</label><select class="form-control" id="filter-ta-truck" onchange="Pages.tiresAnalytics.applyFilter()"><option value="">Todas</option>${trucks.map(t => `<option value="${t.id}">${t.placa}</option>`).join('')}</select></div>
+                </div>
+                ${this.renderAnalyticsCards(history)}
+                <div id="ta-table">${this.renderTable(history, trucks)}</div>
+            </div>`;
+    },
+
+    renderAnalyticsCards(history) {
+        if (!history.length) return '';
+
+        // Group by brand and calculate avg
+        const brands = {};
+        history.forEach(h => {
+            const b = h.marca || 'Sem Marca';
+            if (!brands[b]) brands[b] = { count: 0, sum: 0 };
+            brands[b].count++;
+            brands[b].sum += (h.kmRodados || 0);
+        });
+
+        const brandAverages = Object.entries(brands)
+            .map(([name, data]) => ({ name, avg: Math.round(data.sum / data.count) }))
+            .sort((a, b) => b.avg - a.avg)
+            .slice(0, 3); // Top 3
+
+        return `
+            <div class="stats-grid animate-in" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr))">
+                <div class="stat-card" style="--stat-accent: var(--gradient-primary)">
+                    <div class="stat-icon">🛞</div>
+                    <div class="stat-value">${history.length}</div>
+                    <div class="stat-label">Pneus Descartados/Baixados</div>
+                </div>
+                <div class="stat-card" style="--stat-accent: var(--gradient-success)">
+                    <div class="stat-icon">🏆</div>
+                    <div class="stat-value" style="font-size:1.5rem">${brandAverages[0]?.name || 'N/A'}</div>
+                    <div class="stat-label">Maior Média: ${Utils.formatNumber(brandAverages[0]?.avg || 0)} KM</div>
+                </div>
+                <div class="stat-card" style="--stat-accent: var(--gradient-warning)">
+                    <div class="stat-icon">🥈</div>
+                    <div class="stat-value" style="font-size:1.5rem">${brandAverages[1]?.name || 'N/A'}</div>
+                    <div class="stat-label">2º Lugar Média: ${Utils.formatNumber(brandAverages[1]?.avg || 0)} KM</div>
+                </div>
+            </div>`;
+    },
+
+    renderTable(history, trucks) {
+        if (!history.length) return '<div class="empty-state"><div class="empty-icon">🛞</div><h3>Nenhum pneu no histórico</h3><p>Quando você desmontar um pneu de um caminhão, ele virá para cá.</p></div>';
+
+        return `<div class="table-container"><table class="data-table">
+            <thead>
+                <tr>
+                    <th>Data Retirada</th>
+                    <th>Caminhão</th>
+                    <th>Fogo</th>
+                    <th>Marca</th>
+                    <th>Eixo / Pos</th>
+                    <th>Status Final</th>
+                    <th>Rodou (KM)</th>
+                    <th>Motivo</th>
+                </tr>
+            </thead>
+            <tbody>${history.map(h => {
+            const t = trucks.find(tt => tt.id === h.truckId);
+            const dataStr = h.created_at ? Utils.formatDate(h.created_at.split('T')[0]) : '—';
+            return `<tr>
+                    <td>${dataStr}</td>
+                    <td class="font-mono font-bold">${t?.placa || '—'}</td>
+                    <td class="font-mono font-bold">${h.fogo || '—'}</td>
+                    <td>${h.marca || '—'}</td>
+                    <td>Eixo ${h.eixoOriginal} (${h.posicaoOriginal})</td>
+                    <td><span class="badge" style="background:var(--bg-input);color:var(--text-secondary)">${h.statusNaRetirada || '—'}</span></td>
+                    <td class="font-bold text-success">${Utils.formatNumber(h.kmRodados || 0)} KM</td>
+                    <td class="text-muted"><small>${h.motivo || 'Nenhum'}</small></td>
+                </tr>`;
+        }).join('')}</tbody>
+        </table></div>`;
+    },
+
+    async applyFilter() {
+        let history = await db.getAll('tiresHistory');
+        const trucks = await db.getAll('trucks');
+        const tid = document.getElementById('filter-ta-truck').value;
+
+        if (tid) history = history.filter(h => h.truckId === parseInt(tid));
+        history.sort((a, b) => b.created_at?.localeCompare(a.created_at));
+
+        document.getElementById('ta-table').innerHTML = this.renderTable(history, trucks);
+    }
+};
+
 // ===== FINES PAGE =====
 Pages.fines = {
     async render() {
