@@ -117,9 +117,11 @@ const App = {
             this.applyRoleRestrictions();
             this.navigate(this.userRole === 'motorista' ? 'fuelings' : 'dashboard');
 
-            window.addEventListener('resize', () => {
-                if (App.currentPage === 'dashboard') setTimeout(() => Pages.dashboard.drawCharts && Pages.dashboard.render(), 200);
-            });
+            window.addEventListener('resize', Utils.debounce(() => {
+                if (App.currentPage === 'dashboard' && Pages.dashboard.drawCharts) {
+                    Pages.dashboard.applyDashboardFilter();
+                }
+            }, 300));
 
             this.initialized = true;
 

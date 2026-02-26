@@ -272,7 +272,10 @@ Pages.trucks = {
                     <div class="form-group"><label class="form-label">Ano</label><input type="number" class="form-control" id="f-ano" value="${truck?.ano || ''}" placeholder="2023"></div>
                     <div class="form-group"><label class="form-label">Motorista</label><input type="text" class="form-control" id="f-motorista" value="${truck?.motorista || ''}" placeholder="Nome do motorista"></div>
                 </div>
-                <div class="form-group"><label class="form-label">Status</label><select class="form-control" id="f-status"><option value="ativo" ${truck?.status === 'ativo' ? 'selected' : ''}>Ativo</option><option value="inativo" ${truck?.status === 'inativo' ? 'selected' : ''}>Inativo</option><option value="manutencao" ${truck?.status === 'manutencao' ? 'selected' : ''}>Em Manutenção</option></select></div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">Status</label><select class="form-control" id="f-status"><option value="ativo" ${truck?.status === 'ativo' ? 'selected' : ''}>Ativo</option><option value="inativo" ${truck?.status === 'inativo' ? 'selected' : ''}>Inativo</option><option value="manutencao" ${truck?.status === 'manutencao' ? 'selected' : ''}>Em Manutenção</option></select></div>
+                    <div class="form-group"><label class="form-label">Obrímetro (KM Atual) 🛠️</label><input type="number" class="form-control" id="f-kmAtual" value="${truck?.kmAtual || 0}" placeholder="250000"></div>
+                </div>
                 <div style="margin-top:12px;padding:12px;background:var(--bg-primary);border-radius:var(--radius-md)">
                     <h4 style="font-size:0.85rem;color:var(--accent-primary);margin-bottom:8px">💰 Valores R$/KM desta placa (opcional)</h4>
                     <p class="text-muted" style="font-size:0.72rem;margin-bottom:8px">Deixe em branco para usar o valor padrão do sistema (Configurações).</p>
@@ -296,6 +299,7 @@ Pages.trucks = {
             ano: parseInt(document.getElementById('f-ano').value) || null,
             motorista: document.getElementById('f-motorista').value.trim(),
             status: document.getElementById('f-status').value,
+            kmAtual: parseInt(document.getElementById('f-kmAtual').value) || 0,
             kmCarregado: document.getElementById('f-kmCarregado').value !== '' ? parseFloat(document.getElementById('f-kmCarregado').value) : null,
             kmVazio: document.getElementById('f-kmVazio').value !== '' ? parseFloat(document.getElementById('f-kmVazio').value) : null
         };

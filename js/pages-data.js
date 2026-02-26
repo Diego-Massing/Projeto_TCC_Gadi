@@ -168,6 +168,15 @@ Pages.fuelings = {
         const data = { truckId, data: document.getElementById('f-data').value, litros: parseFloat(document.getElementById('f-litros').value) || 0, valorLitro: parseFloat(document.getElementById('f-valorLitro').value) || 0, valorTotal: parseFloat(document.getElementById('f-valorTotal').value) || 0, valorArla, km: parseInt(document.getElementById('f-km').value) || 0, posto: document.getElementById('f-posto').value.trim(), tipoComb };
         try {
             if (id) { data.id = id; await db.update('fuelings', data); } else { await db.add('fuelings', data); }
+
+            // Atualiza KM do caminhão
+            if (data.km > 0) {
+                const trk = await db.getById('trucks', truckId);
+                if (trk && data.km > (trk.kmAtual || 0)) {
+                    await db.update('trucks', { id: truckId, kmAtual: data.km });
+                }
+            }
+
             Utils.showToast(id ? 'Atualizado!' : 'Abastecimento registrado!', 'success');
             App.closeModal(); App.refreshCurrentPage();
         } catch (e) { Utils.showToast('Erro ao salvar', 'error'); }
@@ -575,6 +584,17 @@ Pages.freights = {
         }
         try {
             if (id) { data.id = id; await db.update('freights', data); } else { await db.add('freights', data); }
+
+            // Atualiza KM do caminhão (considerando o input de KM inserido na rota)
+            if (km > 0) {
+                const trk = await db.getById('trucks', truckId);
+                // Assume that the user either puts the trip distance OR the absolute odometer.
+                // If the user inputs the trip distance (e.g. 500), adding it to kmAtual is risky because we don't know the departure km.
+                // However, wait. In fuelings the user enters absolute KM. In freights, 'f-km' says "KM da Rota" (Trip KM). 
+                // We should add this to the total *only* if we trust the user isn't just typing the absolute odometer by mistake.
+                // Actually, let's only update kmAtual securely from Fuelings which requests absolute odometer. Let's ignore it here initially unless requested.
+            }
+
             Utils.showToast(id ? 'Frete atualizado!' : 'Frete registrado!', 'success'); App.closeModal(); App.refreshCurrentPage();
         } catch (e) { Utils.showToast('Erro ao salvar', 'error'); }
     },
