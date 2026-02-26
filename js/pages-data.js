@@ -393,8 +393,21 @@ Pages.freights = {
             <div id="taxa-efetiva-row" style="display:none;margin-bottom:8px">
                 <span class="text-muted" style="font-size:0.8rem">💡 R$/KM efetivo: </span><strong id="taxa-efetiva-value" class="text-success">—</strong>
             </div>
-            <div id="comissao-fechado-row" style="display:none">
-                <div class="form-group"><label class="form-label" style="font-weight:700;color:var(--accent-warning)">🤝 Comissão do Motorista (Frete Fechado)</label><input type="number" step="0.01" class="form-control" id="f-comissaoFechado" value="${item?.comissaoFechado || ''}" placeholder="Valor que o motorista recebe por esta viagem" style="font-weight:700;font-size:1.1rem"></div>
+            <div id="comissao-fechado-row" style="display:none;margin-bottom:12px;padding:12px;background:var(--bg-primary);border-radius:var(--radius-md)">
+                <label class="form-label" style="font-weight:700;color:var(--accent-warning)">🤝 Comissão do Motorista</label>
+                <div style="display:flex;gap:12px;align-items:center;margin-top:8px">
+                    <select class="form-control" id="f-tipoComissao" style="width:140px" onchange="Pages.freights.onTipoComissaoChange()">
+                        <option value="fixo">R$ Fixo</option>
+                        <option value="percentual">Porcentagem (%)</option>
+                    </select>
+                    <div id="comissao-fixo-container" style="flex:1">
+                        <input type="number" step="0.01" class="form-control" id="f-comissaoFechado" value="${item?.comissaoFechado || ''}" placeholder="Valor em R$" style="font-weight:700;font-size:1.1rem">
+                    </div>
+                    <div id="comissao-pct-container" style="flex:1;display:none;align-items:center;gap:8px">
+                        <input type="number" step="0.1" class="form-control" id="f-comissaoPct" placeholder="% Ex: 10" oninput="Pages.freights.calcComissaoPct()">
+                        <span style="font-weight:700;white-space:nowrap;color:var(--accent-success)" id="comissao-pct-result"> = R$ 0,00</span>
+                    </div>
+                </div>
             </div>
             <div class="form-row">
                 <div class="form-group"><label class="form-label">Cliente</label><input type="text" class="form-control" id="f-cliente" value="${item?.cliente || ''}"></div>
@@ -505,8 +518,33 @@ Pages.freights = {
         const mod = document.getElementById('f-modalidade')?.value;
         if (mod === 'fechado') {
             this.updateTaxaEfetiva();
+            if (document.getElementById('f-tipoComissao')?.value === 'percentual') {
+                this.calcComissaoPct();
+            }
         }
         this.calcPagamento();
+    },
+
+    onTipoComissaoChange() {
+        const tipo = document.getElementById('f-tipoComissao').value;
+        const fixoContainer = document.getElementById('comissao-fixo-container');
+        const pctContainer = document.getElementById('comissao-pct-container');
+        if (tipo === 'percentual') {
+            fixoContainer.style.display = 'none';
+            pctContainer.style.display = 'flex';
+            this.calcComissaoPct();
+        } else {
+            fixoContainer.style.display = 'block';
+            pctContainer.style.display = 'none';
+        }
+    },
+
+    calcComissaoPct() {
+        const pct = parseFloat(document.getElementById('f-comissaoPct').value) || 0;
+        const valorFrete = parseFloat(document.getElementById('f-valorFrete').value) || 0;
+        const resultado = (valorFrete * pct) / 100;
+        document.getElementById('f-comissaoFechado').value = resultado.toFixed(2);
+        document.getElementById('comissao-pct-result').textContent = ' = ' + Utils.formatCurrency(resultado);
     },
 
     updateTaxaEfetiva() {
