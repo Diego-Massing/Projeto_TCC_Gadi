@@ -178,6 +178,7 @@ Pages.driverClosing = {
         this.userId = userId;
         const users = await db.getAll('users');
         const drivers = users.filter(u => u.role === 'motorista');
+        const trucks = await db.getAll('trucks');
         const hoje = new Date();
         const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
         const ultimoDia = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).toISOString().split('T')[0];
@@ -190,7 +191,7 @@ Pages.driverClosing = {
                 <div class="filter-bar">
                     <div class="form-group"><label class="form-label">Motorista</label><select class="form-control" id="dc-driver" onchange="Pages.driverClosing.onFilterChange()">
                         <option value="">Selecione</option>
-                        ${drivers.map(d => `<option value="${d.id}" ${d.id === userId ? 'selected' : ''}>${d.nome} ${d.truckId ? '(' + d.placa + ')' : ''}</option>`).join('')}
+                        ${drivers.map(d => { const trk = trucks.find(t => t.id === d.truckId); return `<option value="${d.id}" ${d.id === userId ? 'selected' : ''}>${d.nome} ${trk ? '(' + trk.placa + ')' : ''}</option>`; }).join('')}
                     </select></div>
                     <div class="form-group"><label class="form-label">Data Início</label><input type="date" class="form-control" id="dc-data-inicio" value="${primeiroDia}" onchange="Pages.driverClosing.onFilterChange()"></div>
                     <div class="form-group"><label class="form-label">Data Fim</label><input type="date" class="form-control" id="dc-data-fim" value="${ultimoDia}" onchange="Pages.driverClosing.onFilterChange()"></div>
