@@ -211,10 +211,7 @@ const App = {
         document.getElementById('mobile-toggle')?.addEventListener('click', () => {
             document.querySelector('.sidebar')?.classList.toggle('open');
         });
-        // Modal close on overlay click
-        document.getElementById('modal-overlay')?.addEventListener('click', (e) => {
-            if (e.target.id === 'modal-overlay') this.closeModal();
-        });
+        // Modal: clicking outside no longer closes (prevent accidental data loss)
     },
 
     async navigate(page, param) {

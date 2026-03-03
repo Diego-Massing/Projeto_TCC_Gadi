@@ -154,15 +154,21 @@ Pages.fuelings = {
         document.getElementById('f-valorTotal').value = ((l * v) + arla).toFixed(2);
     },
 
+    _saving: false,
     async save(id) {
+        if (this._saving) return;
+        this._saving = true;
+        const saveBtn = document.querySelector('.modal-footer .btn-primary');
+        if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Salvando...'; }
+
         const truckId = parseInt(document.getElementById('f-truckId').value) || App.userTruckId;
-        if (!truckId) { Utils.showToast('Selecione o caminhão', 'warning'); return; }
+        if (!truckId) { Utils.showToast('Selecione o caminhão', 'warning'); this._saving = false; if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Salvar'; } return; }
 
         let tipoComb = document.getElementById('f-tipoComb').value;
         let valorArla = 0;
         if (tipoComb !== 'Arla' && document.getElementById('f-valorArla')) {
             valorArla = parseFloat(document.getElementById('f-valorArla').value) || 0;
-            if (valorArla > 0) tipoComb = tipoComb === 'Diesel S-10' ? 'Diesel S-10' : 'Diesel+Arla'; // keeps consistency with imports
+            if (valorArla > 0) tipoComb = tipoComb === 'Diesel S-10' ? 'Diesel S-10' : 'Diesel+Arla';
         }
 
         const data = { truckId, data: document.getElementById('f-data').value, litros: parseFloat(document.getElementById('f-litros').value) || 0, valorLitro: parseFloat(document.getElementById('f-valorLitro').value) || 0, valorTotal: parseFloat(document.getElementById('f-valorTotal').value) || 0, valorArla, km: parseInt(document.getElementById('f-km').value) || 0, posto: document.getElementById('f-posto').value.trim(), tipoComb };
@@ -179,7 +185,7 @@ Pages.fuelings = {
 
             Utils.showToast(id ? 'Atualizado!' : 'Abastecimento registrado!', 'success');
             App.closeModal(); App.refreshCurrentPage();
-        } catch (e) { Utils.showToast('Erro ao salvar', 'error'); }
+        } catch (e) { Utils.showToast('Erro ao salvar', 'error'); } finally { this._saving = false; }
     },
 
     async remove(id) {
@@ -572,9 +578,15 @@ Pages.freights = {
         }
     },
 
+    _saving: false,
     async save(id) {
+        if (this._saving) return;
+        this._saving = true;
+        const saveBtn = document.querySelector('.modal-footer .btn-primary');
+        if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Salvando...'; }
+
         const truckId = parseInt(document.getElementById('f-truckId').value) || App.userTruckId;
-        if (!truckId) { Utils.showToast('Selecione o caminhão', 'warning'); return; }
+        if (!truckId) { Utils.showToast('Selecione o caminhão', 'warning'); this._saving = false; if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Salvar'; } return; }
         const mod = document.getElementById('f-modalidade').value;
         const km = parseFloat(document.getElementById('f-km').value) || 0;
         const valorFrete = parseFloat(document.getElementById('f-valorFrete').value) || 0;
@@ -634,7 +646,7 @@ Pages.freights = {
             }
 
             Utils.showToast(id ? 'Frete atualizado!' : 'Frete registrado!', 'success'); App.closeModal(); App.refreshCurrentPage();
-        } catch (e) { Utils.showToast('Erro ao salvar', 'error'); }
+        } catch (e) { Utils.showToast('Erro ao salvar', 'error'); } finally { this._saving = false; }
     },
 
     async remove(id) { if (!confirm('Excluir?')) return; await db.delete('freights', id); Utils.showToast('Excluído', 'success'); App.refreshCurrentPage(); },

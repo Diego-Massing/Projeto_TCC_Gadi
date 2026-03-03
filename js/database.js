@@ -320,10 +320,6 @@ class FrotaDatabase {
     async getClosingsByTruck(truckId) { return await this.getByIndex('closings', 'truckId', truckId); }
 
     async getDataByTruckAndMonth(storeName, truckId, mes, ano) {
-        // Optimization: Filter by date range in SQL instead of JS
-        // But for compatibility with existing logic, let's keep it simple first
-        // Or better: use JS filter as before unless perf is fast. 
-        // Supabase select is fast.
         const items = await this.getByIndex(storeName, 'truckId', truckId);
         return items.filter(item => { const d = new Date(item.data); return d.getMonth() + 1 === mes && d.getFullYear() === ano; });
     }
@@ -331,6 +327,16 @@ class FrotaDatabase {
     async getDataByUserAndMonth(storeName, userId, mes, ano) {
         const items = await this.getByIndex(storeName, 'userId', userId);
         return items.filter(item => { const d = new Date(item.data); return d.getMonth() + 1 === mes && d.getFullYear() === ano; });
+    }
+
+    async getDataByTruckAndDateRange(storeName, truckId, dataInicio, dataFim) {
+        const items = await this.getByIndex(storeName, 'truckId', truckId);
+        return items.filter(item => item.data >= dataInicio && item.data <= dataFim);
+    }
+
+    async getDataByUserAndDateRange(storeName, userId, dataInicio, dataFim) {
+        const items = await this.getByIndex(storeName, 'userId', userId);
+        return items.filter(item => item.data >= dataInicio && item.data <= dataFim);
     }
 
     async getDriverForTruck(truckId) {
@@ -398,6 +404,14 @@ class FrotaDatabase {
     }
 
     async generateDriverClosing(userId, mes, ano) {
+        // Legacy wrapper — builds date range from month/year
+        const dataInicio = `${ano}-${String(mes).padStart(2, '0')}-01`;
+        const lastDay = new Date(ano, mes, 0).getDate();
+        const dataFim = `${ano}-${String(mes).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+        return this.generateDriverClosingByDateRange(userId, dataInicio, dataFim);
+    }
+
+    async generateDriverClosingByDateRange(userId, dataInicio, dataFim) {
         const user = await this.getById('users', userId);
         if (!user) return null;
 
@@ -407,18 +421,21 @@ class FrotaDatabase {
 
         let freights = [], fuelings = [], fuelingsForMedia = [];
         if (truck) {
-            freights = await this.getDataByTruckAndMonth('freights', truck.id, mes, ano);
-            fuelings = await this.getDataByTruckAndMonth('fuelings', truck.id, mes, ano);
-            const prevDate = new Date(ano, mes - 2, 1);
-            const prevMes = prevDate.getMonth() + 1;
-            const prevAno = prevDate.getFullYear();
-            const prevFuelings = await this.getDataByTruckAndMonth('fuelings', truck.id, prevMes, prevAno);
+            freights = await this.getDataByTruckAndDateRange('freights', truck.id, dataInicio, dataFim);
+            fuelings = await this.getDataByTruckAndDateRange('fuelings', truck.id, dataInicio, dataFim);
+            // For media calculation, also include previous month fuelings
+            const startDate = new Date(dataInicio + 'T00:00:00');
+            const prevMonthStart = new Date(startDate.getFullYear(), startDate.getMonth() - 1, 1);
+            const prevMonthEnd = new Date(startDate.getFullYear(), startDate.getMonth(), 0);
+            const prevDataInicio = prevMonthStart.toISOString().split('T')[0];
+            const prevDataFim = prevMonthEnd.toISOString().split('T')[0];
+            const prevFuelings = await this.getDataByTruckAndDateRange('fuelings', truck.id, prevDataInicio, prevDataFim);
             fuelingsForMedia = [...prevFuelings.map(f => ({ ...f, _prevMonth: true })), ...fuelings];
         }
 
-        const expenses = await this.getDataByUserAndMonth('driverExpenses', userId, mes, ano);
-        const bonuses = await this.getDataByUserAndMonth('driverBonuses', userId, mes, ano);
-        const discounts = await this.getDataByUserAndMonth('driverDiscounts', userId, mes, ano);
+        const expenses = await this.getDataByUserAndDateRange('driverExpenses', userId, dataInicio, dataFim);
+        const bonuses = await this.getDataByUserAndDateRange('driverBonuses', userId, dataInicio, dataFim);
+        const discounts = await this.getDataByUserAndDateRange('driverDiscounts', userId, dataInicio, dataFim);
 
         const rateFreights = freights.filter(f => f.modalidade !== 'fechado');
         const fixedFreights = freights.filter(f => f.modalidade === 'fechado');
@@ -456,7 +473,7 @@ class FrotaDatabase {
         return {
             userId, userName: user.nome, userRole: user.role,
             truckId: truck?.id || null, placa: truck?.placa || '—',
-            mes, ano,
+            dataInicio, dataFim,
             salarioFixo,
             kmCarregado, kmVazio, valorKmCarregado, valorKmVazio,
             pctCarregado, pctVazio,

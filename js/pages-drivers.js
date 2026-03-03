@@ -178,10 +178,9 @@ Pages.driverClosing = {
         this.userId = userId;
         const users = await db.getAll('users');
         const drivers = users.filter(u => u.role === 'motorista');
-        const { mes, ano } = Utils.getCurrentMonth();
-
-        // If no specific userId, show selection
-        const selectedUser = userId ? await db.getById('users', userId) : null;
+        const hoje = new Date();
+        const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
+        const ultimoDia = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).toISOString().split('T')[0];
 
         document.getElementById('page-content').innerHTML = `
             <div class="page-header"><div class="page-header-row">
@@ -193,8 +192,8 @@ Pages.driverClosing = {
                         <option value="">Selecione</option>
                         ${drivers.map(d => `<option value="${d.id}" ${d.id === userId ? 'selected' : ''}>${d.nome} ${d.truckId ? '(' + d.placa + ')' : ''}</option>`).join('')}
                     </select></div>
-                    <div class="form-group"><label class="form-label">Mês</label><select class="form-control" id="dc-mes" onchange="Pages.driverClosing.onFilterChange()">${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}" ${i + 1 === mes ? 'selected' : ''}>${Utils.getMonthName(i + 1)}</option>`).join('')}</select></div>
-                    <div class="form-group"><label class="form-label">Ano</label><input type="number" class="form-control" id="dc-ano" value="${ano}" style="width:100px" onchange="Pages.driverClosing.onFilterChange()"></div>
+                    <div class="form-group"><label class="form-label">Data Início</label><input type="date" class="form-control" id="dc-data-inicio" value="${primeiroDia}" onchange="Pages.driverClosing.onFilterChange()"></div>
+                    <div class="form-group"><label class="form-label">Data Fim</label><input type="date" class="form-control" id="dc-data-fim" value="${ultimoDia}" onchange="Pages.driverClosing.onFilterChange()"></div>
                 </div>
 
                 <!-- Management Section (Always visible if driver selected) -->
@@ -253,8 +252,8 @@ Pages.driverClosing = {
             return;
         }
 
-        const mes = parseInt(document.getElementById('dc-mes').value);
-        const ano = parseInt(document.getElementById('dc-ano').value);
+        const dataInicio = document.getElementById('dc-data-inicio').value;
+        const dataFim = document.getElementById('dc-data-fim').value;
 
         // Show management section
         document.getElementById('dc-management-section').style.display = 'block';
@@ -262,13 +261,13 @@ Pages.driverClosing = {
         // Hide previous closing result until generated again
         document.getElementById('driver-closing-result').innerHTML = '';
 
-        await this.loadManagementData(this.userId, mes, ano);
+        await this.loadManagementData(this.userId, dataInicio, dataFim);
     },
 
-    async loadManagementData(userId, mes, ano) {
-        const expenses = await db.getDataByUserAndMonth('driverExpenses', userId, mes, ano);
-        const bonuses = await db.getDataByUserAndMonth('driverBonuses', userId, mes, ano);
-        const discounts = await db.getDataByUserAndMonth('driverDiscounts', userId, mes, ano);
+    async loadManagementData(userId, dataInicio, dataFim) {
+        const expenses = await db.getDataByUserAndDateRange('driverExpenses', userId, dataInicio, dataFim);
+        const bonuses = await db.getDataByUserAndDateRange('driverBonuses', userId, dataInicio, dataFim);
+        const discounts = await db.getDataByUserAndDateRange('driverDiscounts', userId, dataInicio, dataFim);
 
         // Render Expenses
         const expHtml = expenses.length ? `<table class="table-sm" style="width:100%">
@@ -304,10 +303,10 @@ Pages.driverClosing = {
     async generate() {
         const userId = parseInt(document.getElementById('dc-driver').value);
         if (!userId) { Utils.showToast('Selecione um motorista', 'warning'); return; }
-        const mes = parseInt(document.getElementById('dc-mes').value);
-        const ano = parseInt(document.getElementById('dc-ano').value);
+        const dataInicio = document.getElementById('dc-data-inicio').value;
+        const dataFim = document.getElementById('dc-data-fim').value;
 
-        const closingData = await db.generateDriverClosing(userId, mes, ano);
+        const closingData = await db.generateDriverClosingByDateRange(userId, dataInicio, dataFim);
         if (!closingData) { document.getElementById('driver-closing-result').innerHTML = '<div class="empty-state"><h3>Motorista não encontrado</h3></div>'; return; }
 
         this._lastClosing = closingData; // Store for PDF
@@ -356,7 +355,7 @@ Pages.driverClosing = {
         document.getElementById('driver-closing-result').innerHTML = `
             <div class="card animate-in" style="border-top: 4px solid var(--accent-primary)">
                 <div class="card-header">
-                    <h3>\ud83d\udccb ${closingData.userName} \u2014 ${Utils.getMonthName(mes)}/${ano}</h3>
+                    <h3>\ud83d\udccb ${closingData.userName} \u2014 ${Utils.formatDate(closingData.dataInicio)} a ${Utils.formatDate(closingData.dataFim)}</h3>
                     <div class="btn-group">
                         <button class="btn btn-primary btn-sm" onclick="Pages.driverClosing.exportPDF()">\ud83d\udcc4 Exportar PDF</button>
                     </div>
@@ -617,9 +616,9 @@ Pages.driverClosing = {
 
     // Refresh only the management lists content, or also generate report if visible
     async refreshData(userId) {
-        const mes = parseInt(document.getElementById('dc-mes').value);
-        const ano = parseInt(document.getElementById('dc-ano').value);
-        await this.loadManagementData(userId, mes, ano);
+        const dataInicio = document.getElementById('dc-data-inicio').value;
+        const dataFim = document.getElementById('dc-data-fim').value;
+        await this.loadManagementData(userId, dataInicio, dataFim);
         // If result is already showing, regenerate it too to keep numbers consistent
         if (document.getElementById('driver-closing-result').innerHTML !== '') {
             this.generate();
@@ -632,7 +631,7 @@ Pages.driverClosing = {
         if (!c) { Utils.showToast('Gere o fechamento primeiro', 'warning'); return; }
 
         const printWindow = window.open('', '_blank');
-        printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fechamento ${c.userName} — ${Utils.getMonthName(c.mes)}/${c.ano}</title>
+        printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fechamento ${c.userName} — ${Utils.formatDate(c.dataInicio)} a ${Utils.formatDate(c.dataFim)}</title>
         <style>
             * { margin:0; padding:0; box-sizing:border-box; }
             body { font-family: 'Segoe UI', Arial, sans-serif; padding:32px; color:#1a1a2e; font-size:12px; line-height:1.4; }
@@ -665,7 +664,7 @@ Pages.driverClosing = {
 
             <div class="header">
                 <h1>FECHAMENTO DO MOTORISTA</h1>
-                <h2>${Utils.getMonthName(c.mes)} / ${c.ano}</h2>
+                <h2>${Utils.formatDate(c.dataInicio)} a ${Utils.formatDate(c.dataFim)}</h2>
             </div>
 
             <div class="info-row">
