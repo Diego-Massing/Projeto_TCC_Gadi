@@ -1,5 +1,6 @@
 // ===== MONTHLY CLOSING PAGE =====
 Pages.monthlyClosing = {
+    _closingsData: [],
     async render() {
         const trucks = await db.getAll('trucks');
         const { mes, ano } = Utils.getCurrentMonth();
@@ -22,6 +23,7 @@ Pages.monthlyClosing = {
         const ano = parseInt(document.getElementById('cl-ano').value);
         const closings = [];
         for (const t of trucks) { closings.push(await db.generateMonthlyClosing(t.id, mes, ano)); }
+        this._closingsData = closings;
 
         const totalRec = closings.reduce((s, c) => s + c.totalFretes, 0);
         const totalDesp = closings.reduce((s, c) => s + c.totalAbastecimento + c.totalMultas + (c.totalDespesas || 0), 0);
@@ -33,15 +35,77 @@ Pages.monthlyClosing = {
                 <div class="closing-item"><div class="closing-label">Total Custos</div><div class="closing-value text-danger">${Utils.formatCurrency(totalDesp)}</div></div>
                 <div class="closing-item ${saldoTotal >= 0 ? 'positive' : 'negative'}"><div class="closing-label">Saldo Total</div><div class="closing-value">${Utils.formatCurrency(saldoTotal)}</div></div>
             </div>
-            <div class="table-container"><table class="data-table"><thead><tr><th>Placa</th><th>Abast.</th><th>Out. Desp.</th><th>Fretes</th><th>Saldo</th><th>Média</th></tr></thead><tbody>${closings.map(c => `<tr style="cursor:pointer" onclick="App.navigate('truck-detail',${c.truckId})">
-                    <td class="font-mono font-bold">${c.placa}</td>
+            <div class="table-container"><table class="data-table"><thead><tr><th>Placa</th><th>Abast.</th><th>Out. Desp.</th><th>Fretes</th><th>Saldo</th><th>Média km/L</th></tr></thead><tbody>${closings.map((c, idx) => `<tr>
+                    <td class="font-mono font-bold" style="cursor:pointer" onclick="App.navigate('truck-detail',${c.truckId})">${c.placa}</td>
                     <td class="text-danger">${Utils.formatCurrency(c.totalAbastecimento)}</td>
                     <td class="text-danger">${Utils.formatCurrency((c.totalDespesas || 0) + c.totalMultas)} <small class="text-muted">(${c.qtdDespesas + c.qtdMultas})</small></td>
                     <td class="text-success">${Utils.formatCurrency(c.totalFretes)}</td>
                     <td class="font-bold ${c.saldo >= 0 ? 'text-success' : 'text-danger'}">${Utils.formatCurrency(c.saldo)}</td>
-                    <td>${c.mediaConsumo || '—'}</td>
-                </tr>`).join('')}</tbody></table></div>`;
+                    <td style="cursor:pointer" onclick="Pages.monthlyClosing.showMediaSelector(${idx})" title="Clique para ajustar"><span class="badge badge-info" id="media-badge-${idx}" style="font-size:0.85rem">${c.mediaConsumo || '—'}</span> <small class="text-muted">⚙️</small></td>
+                </tr>`).join('')}</tbody></table></div>
+            <div id="media-selector-area"></div>`;
         Utils.showToast(`Fechamentos de ${Utils.getMonthName(mes)}/${ano} gerados!`, 'success');
+    },
+    showMediaSelector(idx) {
+        const c = this._closingsData[idx];
+        if (!c) return;
+        const allF = (c.fuelingsForMedia || c.fuelings || []).filter(f => f.km > 0 && f.tipoComb !== 'Arla').sort((a, b) => (a.data || '').localeCompare(b.data || '') || (a.km - b.km));
+        if (allF.length < 2) {
+            document.getElementById('media-selector-area').innerHTML = `<div class="card mt-3 animate-in" style="border:2px solid var(--accent-warning)"><div class="card-body"><p class="text-muted text-center">⚠️ ${c.placa}: precisa de no mínimo 2 abastecidas com KM para calcular a média.</p></div></div>`;
+            return;
+        }
+        document.getElementById('media-selector-area').innerHTML = `
+            <div class="card mt-3 animate-in" style="border:2px solid var(--accent-success);background:rgba(34,197,94,0.03)">
+                <div class="card-header"><h3>⛽ Média km/L — ${c.placa}</h3></div>
+                <div class="card-body">
+                    <p class="text-muted" style="font-size:0.8rem;margin-bottom:10px">Selecione a abastecida <strong>inicial</strong> e <strong>final</strong>. Fórmula: <code>(KM final − KM inicial) / (Total litros − Litros da abastecida inicial)</code></p>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1">
+                            <label class="form-label" style="font-weight:700;color:var(--accent-warning)">🏁 Abastecida Inicial</label>
+                            <select class="form-control" id="mc-fuel-start" onchange="Pages.monthlyClosing.recalcMedia(${idx})">
+                                ${allF.map((f, i) => `<option value="${f.id}" ${i === 0 ? 'selected' : ''}>${f._prevMonth ? '[Mês ant.] ' : ''}${Utils.formatDate(f.data)} — ${Utils.formatNumber(f.km)} km — ${Utils.formatNumber(f.litros, 1)}L${f.posto ? ' — ' + f.posto : ''}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex:1">
+                            <label class="form-label" style="font-weight:700;color:var(--accent-primary)">🏁 Abastecida Final</label>
+                            <select class="form-control" id="mc-fuel-end" onchange="Pages.monthlyClosing.recalcMedia(${idx})">
+                                ${allF.map((f, i, arr) => `<option value="${f.id}" ${i === arr.length - 1 ? 'selected' : ''}>${f._prevMonth ? '[Mês ant.] ' : ''}${Utils.formatDate(f.data)} — ${Utils.formatNumber(f.km)} km — ${Utils.formatNumber(f.litros, 1)}L${f.posto ? ' — ' + f.posto : ''}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+                    <div id="mc-calc-result" class="mt-2" style="padding:12px;background:var(--bg-secondary);border-radius:var(--radius-md);font-weight:600"></div>
+                </div>
+            </div>`;
+        this.recalcMedia(idx);
+    },
+    recalcMedia(idx) {
+        const c = this._closingsData[idx];
+        if (!c) return;
+        const startId = parseInt(document.getElementById('mc-fuel-start')?.value);
+        const endId = parseInt(document.getElementById('mc-fuel-end')?.value);
+        const fuelings = (c.fuelingsForMedia || c.fuelings || []).filter(f => f.km > 0 && f.tipoComb !== 'Arla').sort((a, b) => (a.data || '').localeCompare(b.data || '') || (a.km - b.km));
+        const startFuel = fuelings.find(f => f.id === startId);
+        const endFuel = fuelings.find(f => f.id === endId);
+        const resultEl = document.getElementById('mc-calc-result');
+        if (!startFuel || !endFuel) { if (resultEl) resultEl.innerHTML = '<span class="text-muted">Selecione ambas as abastecidas.</span>'; return; }
+        if (endFuel.km <= startFuel.km) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--accent-danger)">⚠️ A abastecida final deve ter KM maior que a inicial.</span>'; return; }
+        const startIdx = fuelings.indexOf(startFuel);
+        const endIdx = fuelings.indexOf(endFuel);
+        const range = fuelings.slice(startIdx, endIdx + 1);
+        const litrosRange = range.slice(1).reduce((s, f) => s + (f.litros || 0), 0);
+        const kmDiff = endFuel.km - startFuel.km;
+        const media = litrosRange > 0 ? kmDiff / litrosRange : 0;
+        if (resultEl) {
+            resultEl.innerHTML = `<div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center">
+                <div>📏 KM: <strong>${Utils.formatNumber(kmDiff)}</strong> <span class="text-muted">(${Utils.formatNumber(endFuel.km)} − ${Utils.formatNumber(startFuel.km)})</span></div>
+                <div>⛽ Litros: <strong>${Utils.formatNumber(litrosRange, 1)}</strong> <span class="text-muted">(${range.length - 1} abastecidas)</span></div>
+                <div style="font-size:1.2rem;color:var(--accent-success)">📊 Média: <strong>${media.toFixed(2)} km/L</strong></div>
+            </div>`;
+        }
+        // Update badge in table
+        const badge = document.getElementById(`media-badge-${idx}`);
+        if (badge) badge.textContent = media.toFixed(2);
+        c.mediaConsumo = parseFloat(media.toFixed(2));
     }
 };
 

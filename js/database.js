@@ -371,21 +371,23 @@ class FrotaDatabase {
 
         const totalLitros = fuelings.filter(f => f.tipoComb !== 'Arla').reduce((s, f) => s + (f.litros || 0), 0);
         const totalKmFretes = freights.reduce((s, f) => s + (f.km || 0), 0);
-        const kmValues = fuelings.filter(f => f.km > 0 && f.tipoComb !== 'Arla').map(f => f.km);
-        const totalKm = kmValues.length >= 2 ? Math.max(...kmValues) - Math.min(...kmValues) : 0;
+
+        // Media calculation: sort fuelings with KM, use (last KM - first KM) / (liters excluding first fueling)
+        const allFuelMedia = fuelingsForMedia.filter(f => f.km > 0 && f.tipoComb !== 'Arla').sort((a, b) => (a.data || '').localeCompare(b.data || '') || (a.km - b.km));
+        let totalKm = 0, litrosMedia = 0;
+        if (allFuelMedia.length >= 2) {
+            totalKm = allFuelMedia[allFuelMedia.length - 1].km - allFuelMedia[0].km;
+            litrosMedia = allFuelMedia.slice(1).reduce((s, f) => s + (f.litros || 0), 0);
+        }
+        const mediaConsumo = totalKm > 0 && litrosMedia > 0 ? parseFloat((totalKm / litrosMedia).toFixed(2)) : 0;
 
         const closing = {
             truckId, placa: truck?.placa || '', mes, ano,
             totalAbastecimento, totalFretes, totalMultas, totalDespesas,
             totalLitros, totalKm, totalKmFretes,
-            mediaConsumo: totalKm > 0 && totalLitros > 0 ? parseFloat((totalKm / totalLitros).toFixed(2)) : 0,
+            mediaConsumo,
             saldo: totalFretes - totalAbastecimento - totalMultas - totalDespesas,
             qtdAbastecimentos: fuelings.length, qtdFretes: freights.length, qtdMultas: fines.length, qtdDespesas: expenses.length,
-            // Don't store full arrays in closing object stored in DB to save space/complexity?
-            // Original code didn't seem to persist full arrays in 'closings' store, 
-            // but returned them. Wait, line 368 in original: `fuelings: fuelings,` 
-            // logic: `await this.add('closings', closing);`
-            // So it DOES persist them. JSONB in Postgres handles this fine.
             fuelings: fuelings,
             fuelingsForMedia: fuelingsForMedia,
             geradoEm: new Date().toISOString()
