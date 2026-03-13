@@ -350,6 +350,18 @@ class FrotaDatabase {
         return await this.getById('trucks', user.truckId);
     }
 
+    // ===== TRUCK FIXED EXPENSES =====
+    async getTruckFixedExpenses(truckId) {
+        const key = `truckFixedExpenses_${truckId}`;
+        const data = await this.getSetting(key);
+        return data || [];
+    }
+
+    async setTruckFixedExpenses(truckId, items) {
+        const key = `truckFixedExpenses_${truckId}`;
+        return await this.setSetting(key, items);
+    }
+
     // Core Business Logic: Monthly Closing
     async generateMonthlyClosing(truckId, mes, ano) {
         const fuelings = await this.getDataByTruckAndMonth('fuelings', truckId, mes, ano);
@@ -357,6 +369,10 @@ class FrotaDatabase {
         const fines = await this.getDataByTruckAndMonth('fines', truckId, mes, ano);
         const expenses = await this.getDataByTruckAndMonth('truckExpenses', truckId, mes, ano);
         const truck = await this.getById('trucks', truckId);
+
+        // Fixed expenses (recurring monthly)
+        const fixedExpenses = await this.getTruckFixedExpenses(truckId);
+        const totalDespesasFixas = fixedExpenses.reduce((s, f) => s + (f.valor || 0), 0);
 
         const prevDate = new Date(ano, mes - 2, 1);
         const prevMes = prevDate.getMonth() + 1; // JS month 0-11
@@ -383,10 +399,11 @@ class FrotaDatabase {
 
         const closing = {
             truckId, placa: truck?.placa || '', mes, ano,
-            totalAbastecimento, totalFretes, totalMultas, totalDespesas,
+            totalAbastecimento, totalFretes, totalMultas, totalDespesas, totalDespesasFixas,
+            fixedExpenses,
             totalLitros, totalKm, totalKmFretes,
-            mediaConsumo,
-            saldo: totalFretes - totalAbastecimento - totalMultas - totalDespesas,
+            mediaConsumo: totalKm > 0 && totalLitros > 0 ? parseFloat((totalKm / totalLitros).toFixed(2)) : 0,
+            saldo: totalFretes - totalAbastecimento - totalMultas - totalDespesas - totalDespesasFixas,
             qtdAbastecimentos: fuelings.length, qtdFretes: freights.length, qtdMultas: fines.length, qtdDespesas: expenses.length,
             fuelings: fuelings,
             fuelingsForMedia: fuelingsForMedia,
@@ -405,21 +422,27 @@ class FrotaDatabase {
         return closing;
     }
 
-    async generateDriverClosing(userId, mes, ano) {
+    async generateDriverClosing(userId, mes, ano, diasTrabalhados) {
         // Legacy wrapper — builds date range from month/year
         const dataInicio = `${ano}-${String(mes).padStart(2, '0')}-01`;
         const lastDay = new Date(ano, mes, 0).getDate();
         const dataFim = `${ano}-${String(mes).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-        return this.generateDriverClosingByDateRange(userId, dataInicio, dataFim);
+        return this.generateDriverClosingByDateRange(userId, dataInicio, dataFim, diasTrabalhados);
     }
 
-    async generateDriverClosingByDateRange(userId, dataInicio, dataFim) {
+    async generateDriverClosingByDateRange(userId, dataInicio, dataFim, diasTrabalhados) {
         const user = await this.getById('users', userId);
         if (!user) return null;
 
         const truck = user.truckId ? await this.getById('trucks', user.truckId) : null;
         const commConfig = await this.getCommissionConfig();
         const rates = truck ? await this.getKmRatesForTruck(truck.id) : await this.getKmRates();
+
+        // Calculate days in period and proportional salary
+        const start = new Date(dataInicio + 'T00:00:00');
+        const end = new Date(dataFim + 'T00:00:00');
+        const diasNoMes = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+        if (!diasTrabalhados || diasTrabalhados > diasNoMes) diasTrabalhados = diasNoMes;
 
         let freights = [], fuelings = [], fuelingsForMedia = [];
         if (truck) {
@@ -453,7 +476,12 @@ class FrotaDatabase {
 
         const pctCarregado = user.comKmCarregado !== null && user.comKmCarregado !== undefined ? user.comKmCarregado : commConfig.comissaoKmCarregado;
         const pctVazio = user.comKmVazio !== null && user.comKmVazio !== undefined ? user.comKmVazio : commConfig.comissaoKmVazio;
-        const salarioFixo = user.salarioFixo || commConfig.salarioFixo;
+        const salarioFixoBase = user.salarioFixo || commConfig.salarioFixo;
+
+        // Proportional salary: if driver didn't work full month
+        const salarioFixo = diasTrabalhados < diasNoMes
+            ? parseFloat((salarioFixoBase * (diasTrabalhados / diasNoMes)).toFixed(2))
+            : salarioFixoBase;
 
         const comissaoCarregado = valorKmCarregado * (pctCarregado / 100);
         const comissaoVazio = valorKmVazio * (pctVazio / 100);
@@ -476,7 +504,7 @@ class FrotaDatabase {
             userId, userName: user.nome, userRole: user.role,
             truckId: truck?.id || null, placa: truck?.placa || '—',
             dataInicio, dataFim,
-            salarioFixo,
+            salarioFixo, salarioFixoBase, diasTrabalhados, diasNoMes,
             kmCarregado, kmVazio, valorKmCarregado, valorKmVazio,
             pctCarregado, pctVazio,
             comissaoCarregado, comissaoVazio, totalComissaoKm,
@@ -489,7 +517,7 @@ class FrotaDatabase {
             discounts, totalDiscounts,
             totalPagar,
             qtdFretes: freights.length,
-            freights, fuelings, fuelingsForMedia,
+            freights: freights.sort((a, b) => (a.data || '').localeCompare(b.data || '')), fuelings, fuelingsForMedia,
             rates, ratesIsCustom: rates.isCustom || false,
             geradoEm: new Date().toISOString()
         };

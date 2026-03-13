@@ -195,6 +195,7 @@ Pages.driverClosing = {
                     </select></div>
                     <div class="form-group"><label class="form-label">Data Início</label><input type="date" class="form-control" id="dc-data-inicio" value="${primeiroDia}" onchange="Pages.driverClosing.onFilterChange()"></div>
                     <div class="form-group"><label class="form-label">Data Fim</label><input type="date" class="form-control" id="dc-data-fim" value="${ultimoDia}" onchange="Pages.driverClosing.onFilterChange()"></div>
+                    <div class="form-group"><label class="form-label">Dias Trabalhados</label><input type="number" min="1" max="31" class="form-control" id="dc-dias" value="${new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate()}" style="width:100px" title="Dias trabalhados no período (para comissão fixa proporcional)"></div>
                 </div>
 
                 <!-- Management Section (Always visible if driver selected) -->
@@ -256,6 +257,18 @@ Pages.driverClosing = {
         const dataInicio = document.getElementById('dc-data-inicio').value;
         const dataFim = document.getElementById('dc-data-fim').value;
 
+        // Update dias trabalhados max when date range changes
+        const startD = new Date(dataInicio + 'T00:00:00');
+        const endD = new Date(dataFim + 'T00:00:00');
+        const diasIntervalo = Math.round((endD - startD) / (1000 * 60 * 60 * 24)) + 1;
+        const diasInput = document.getElementById('dc-dias');
+        if (diasInput) {
+            diasInput.max = diasIntervalo;
+            if (parseInt(diasInput.value) > diasIntervalo || !diasInput._userEdited) {
+                diasInput.value = diasIntervalo;
+            }
+        }
+
         // Show management section
         document.getElementById('dc-management-section').style.display = 'block';
 
@@ -307,13 +320,22 @@ Pages.driverClosing = {
         const dataInicio = document.getElementById('dc-data-inicio').value;
         const dataFim = document.getElementById('dc-data-fim').value;
 
-        const closingData = await db.generateDriverClosingByDateRange(userId, dataInicio, dataFim);
+        // Mark that user has edited dias field
+        const diasInput = document.getElementById('dc-dias');
+        if (diasInput) diasInput._userEdited = true;
+
+        const startD = new Date(dataInicio + 'T00:00:00');
+        const endD = new Date(dataFim + 'T00:00:00');
+        const diasIntervalo = Math.round((endD - startD) / (1000 * 60 * 60 * 24)) + 1;
+        const diasTrabalhados = diasInput?.value ? parseInt(diasInput.value) : diasIntervalo;
+
+        const closingData = await db.generateDriverClosingByDateRange(userId, dataInicio, dataFim, diasTrabalhados);
         if (!closingData) { document.getElementById('driver-closing-result').innerHTML = '<div class="empty-state"><h3>Motorista não encontrado</h3></div>'; return; }
 
         this._lastClosing = closingData; // Store for PDF
 
         const {
-            user, placa, salarioFixo,
+            user, placa, salarioFixo, salarioFixoBase, diasTrabalhados: dias, diasNoMes,
             kmCarregado, kmVazio, valorKmCarregado, valorKmVazio, pctCarregado, pctVazio,
             comissaoCarregado, comissaoVazio, totalComissaoKm,
             totalFreteFechado, totalComissaoFechado, kmFreteFechado, qtdFreteFechado, fixedFreights,
@@ -372,7 +394,7 @@ Pages.driverClosing = {
                         <table class="data-table">
                             <thead><tr><th>Descri\u00e7\u00e3o</th><th class="text-right">Valor</th></tr></thead>
                             <tbody>
-                                ${salarioFixo > 0 ? `<tr><td>Sal\u00e1rio Fixo</td><td class="text-right font-bold">${Utils.formatCurrency(salarioFixo)}</td></tr>` : ''}
+                                ${salarioFixo > 0 ? `<tr><td>Sal\u00e1rio Fixo${dias < diasNoMes ? ' <small class="text-muted">(' + dias + '/' + diasNoMes + ' dias — proporcional de ' + Utils.formatCurrency(salarioFixoBase) + ')</small>' : ''}</td><td class="text-right font-bold">${Utils.formatCurrency(salarioFixo)}</td></tr>` : ''}
                                 ${comissaoCarregado > 0 ? `<tr><td>Comiss\u00e3o KM Carregado \u2014 ${Utils.formatNumber(kmCarregado)} km \u00d7 ${Utils.formatCurrency(rates.carregado)}/km \u00d7 ${pctCarregado}%</td><td class="text-right font-bold text-success">${Utils.formatCurrency(comissaoCarregado)}</td></tr>` : ''}
                                 ${comissaoVazio > 0 ? `<tr><td>Comiss\u00e3o KM Vazio \u2014 ${Utils.formatNumber(kmVazio)} km \u00d7 ${Utils.formatCurrency(rates.vazio)}/km \u00d7 ${pctVazio}%</td><td class="text-right font-bold text-success">${Utils.formatCurrency(comissaoVazio)}</td></tr>` : ''}
                                 ${(qtdFreteFechado || 0) > 0 ? `<tr style="background:rgba(99,102,241,0.05)"><td>\ud83d\udd12 Fretes Valor Fechado (${qtdFreteFechado}x \u2014 ${Utils.formatNumber(kmFreteFechado)} km) \u2014 Comiss\u00e3o</td><td class="text-right font-bold text-success">${Utils.formatCurrency(totalComissaoFechado)}</td></tr>` : ''}
@@ -686,7 +708,7 @@ Pages.driverClosing = {
             <table>
                 <thead><tr><th>Descrição</th><th class="text-right">Valor</th></tr></thead>
                 <tbody>
-                    ${c.salarioFixo > 0 ? `<tr><td>Salário Fixo</td><td class="text-right">${Utils.formatCurrency(c.salarioFixo)}</td></tr>` : ''}
+                    ${c.salarioFixo > 0 ? `<tr><td>Salário Fixo${c.diasTrabalhados < c.diasNoMes ? ' <small style="color:#888">(${c.diasTrabalhados}/${c.diasNoMes} dias — proporcional de ${Utils.formatCurrency(c.salarioFixoBase)})</small>' : ''}</td><td class="text-right">${Utils.formatCurrency(c.salarioFixo)}</td></tr>` : ''}
                     ${c.comissaoCarregado > 0 ? `<tr><td>Comissão KM Carregado — ${Utils.formatNumber(c.kmCarregado)} km × ${Utils.formatCurrency(c.rates.carregado)}/km × ${c.pctCarregado}%${c.ratesIsCustom ? ' (taxa da placa)' : ''}</td><td class="text-right">${Utils.formatCurrency(c.comissaoCarregado)}</td></tr>` : ''}
                     ${c.comissaoVazio > 0 ? `<tr><td>Comissão KM Vazio — ${Utils.formatNumber(c.kmVazio)} km × ${Utils.formatCurrency(c.rates.vazio)}/km × ${c.pctVazio}%${c.ratesIsCustom ? ' (taxa da placa)' : ''}</td><td class="text-right">${Utils.formatCurrency(c.comissaoVazio)}</td></tr>` : ''}
                     ${(c.qtdFreteFechado || 0) > 0 ? `<tr style="background:#f0f0ff"><td>🔒 Fretes Valor Fechado (${c.qtdFreteFechado}x — ${Utils.formatNumber(c.kmFreteFechado)} km) — Comissão</td><td class="text-right"><strong>${Utils.formatCurrency(c.totalComissaoFechado)}</strong></td></tr>` : ''}

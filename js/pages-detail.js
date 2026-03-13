@@ -14,7 +14,8 @@ Pages.truckDetail = {
             fines: await db.getFinesByTruck(id),
             expenses: await db.getByIndex('truckExpenses', 'truckId', id),
             maintenance: await db.getByIndex('maintenancePlans', 'truckId', id),
-            tires: await db.getByIndex('tires', 'truckId', id)
+            tires: await db.getByIndex('tires', 'truckId', id),
+            fixedExpenses: await db.getTruckFixedExpenses(id)
         };
 
         const { mes, ano } = Utils.getCurrentMonth();
@@ -57,13 +58,14 @@ Pages.truckDetail = {
         const totalExpenses = fExpenses.reduce((s, f) => s + (f.valor || 0), 0);
         const totalLitros = fFuel.reduce((s, f) => s + (f.litros || 0), 0);
         const saldoGeral = totalFreight - totalFuel - totalFines - totalExpenses;
+        const totalFixed = (this._truckData.fixedExpenses || []).reduce((s, f) => s + (f.valor || 0), 0);
 
         document.getElementById('truck-detail-content').innerHTML = `
                 <div class="stats-grid animate-in">
                     <div class="stat-card" style="--stat-accent:var(--gradient-danger)"><div class="stat-icon">\u26fd</div><div class="stat-value">${Utils.formatCurrency(totalFuel)}</div><div class="stat-label">${fFuel.length} abastecimentos \u2014 ${Utils.formatNumber(totalLitros, 1)}L</div></div>
                     <div class="stat-card" style="--stat-accent:var(--gradient-success)"><div class="stat-icon">\ud83d\udce6</div><div class="stat-value">${Utils.formatCurrency(totalFreight)}</div><div class="stat-label">${fFreight.length} fretes realizados</div></div>
-                    <div class="stat-card" style="--stat-accent:var(--gradient-warning)"><div class="stat-icon">\ud83d\udcb8</div><div class="stat-value">${Utils.formatCurrency(totalFines + totalExpenses)}</div><div class="stat-label">${fFines.length} multas, ${fExpenses.length} despesas</div></div>
-                    <div class="stat-card" style="--stat-accent:${saldoGeral >= 0 ? 'var(--gradient-success)' : 'var(--gradient-danger)'}"><div class="stat-icon">\ud83d\udcb2</div><div class="stat-value ${saldoGeral >= 0 ? 'text-success' : 'text-danger'}">${Utils.formatCurrency(saldoGeral)}</div><div class="stat-label">Saldo Geral</div></div>
+                    <div class="stat-card" style="--stat-accent:var(--gradient-warning)"><div class="stat-icon">\ud83d\udcb8</div><div class="stat-value">${Utils.formatCurrency(totalFines + totalExpenses + totalFixed)}</div><div class="stat-label">${fFines.length} multas, ${fExpenses.length} despesas${totalFixed > 0 ? ', fixas: ' + Utils.formatCurrency(totalFixed) : ''}</div></div>
+                    <div class="stat-card" style="--stat-accent:${(saldoGeral - totalFixed) >= 0 ? 'var(--gradient-success)' : 'var(--gradient-danger)'}"><div class="stat-icon">\ud83d\udcb2</div><div class="stat-value ${(saldoGeral - totalFixed) >= 0 ? 'text-success' : 'text-danger'}">${Utils.formatCurrency(saldoGeral - totalFixed)}</div><div class="stat-label">Saldo Geral</div></div>
                 </div>
                 <div class="tabs">
                     <button class="tab-btn active" onclick="Pages.truckDetail.showTab('fuel',this)">\u26fd Abast.</button>
@@ -73,6 +75,7 @@ Pages.truckDetail = {
                     ` : ''}
                     <button class="tab-btn" onclick="Pages.truckDetail.showTab('freight',this)">\ud83d\udce6 Fretes</button>
                     <button class="tab-btn" onclick="Pages.truckDetail.showTab('expenses',this)">\ud83d\udcb8 Despesas</button>
+                    <button class="tab-btn" onclick="Pages.truckDetail.showTab('fixed',this)">\ud83d\udccc Fixas</button>
                     <button class="tab-btn" onclick="Pages.truckDetail.showTab('fines',this)">\ud83d\udea8 Multas</button>
                     <button class="tab-btn" onclick="Pages.truckDetail.showTab('closing',this)">\ud83d\udcca Fechamento</button>
                 </div>
@@ -83,6 +86,7 @@ Pages.truckDetail = {
                 ` : ''}
                 <div id="tab-freight" class="tab-content">${this.renderFreightTab(fFreight)}</div>
                 <div id="tab-expenses" class="tab-content">${this.renderExpensesTab(fExpenses)}</div>
+                <div id="tab-fixed" class="tab-content">${this.renderFixedExpensesTab()}</div>
                 <div id="tab-fines" class="tab-content">${this.renderFinesTab(fFines)}</div>
                 <div id="tab-closing" class="tab-content">${this.renderClosingTab()}</div>`;
     },
@@ -255,6 +259,7 @@ Pages.truckDetail = {
                 <div class="closing-item"><div class="closing-label">Fretes (${closing.qtdFretes})</div><div class="closing-value text-success">${Utils.formatCurrency(closing.totalFretes)}</div></div>
                 <div class="closing-item"><div class="closing-label">Multas (${closing.qtdMultas})</div><div class="closing-value text-warning">${Utils.formatCurrency(closing.totalMultas)}</div></div>
                 <div class="closing-item"><div class="closing-label">Despesas (${closing.qtdDespesas})</div><div class="closing-value text-danger">${Utils.formatCurrency(closing.totalDespesas)}</div></div>
+                ${closing.totalDespesasFixas > 0 ? `<div class="closing-item"><div class="closing-label">Desp. Fixas (${(closing.fixedExpenses || []).length})</div><div class="closing-value text-danger">${Utils.formatCurrency(closing.totalDespesasFixas)}</div></div>` : ''}
                 <div class="closing-item ${closing.saldo >= 0 ? 'positive' : 'negative'}"><div class="closing-label">Saldo</div><div class="closing-value">${Utils.formatCurrency(closing.saldo)}</div></div>
                 <div class="closing-item"><div class="closing-label">Litros</div><div class="closing-value" id="truck-closing-litros">${Utils.formatNumber(closing.totalLitros, 1)}</div></div>
                 <div class="closing-item"><div class="closing-label">M\u00e9dia km/L</div><div class="closing-value" id="truck-closing-media">${closing.mediaConsumo}</div></div>
@@ -334,6 +339,7 @@ Pages.truckDetail = {
         if (litrosEl) litrosEl.textContent = Utils.formatNumber(litrosRange, 1);
         if (mediaEl) mediaEl.textContent = media.toFixed(2);
     },
+
 
     // ===== MAINTENANCE LOGIC =====
     async showMaintenanceForm(id) {
@@ -485,5 +491,65 @@ Pages.truckDetail = {
             this.render(this.truckId);
             setTimeout(() => this.showTab('tires', document.querySelectorAll('.tab-btn')[2]), 200);
         } catch (e) { Utils.showToast('Erro ao arquivar pneu', 'error'); }
+    },
+
+    // ===== FIXED EXPENSES TAB =====
+    renderFixedExpensesTab() {
+        const items = this._truckData.fixedExpenses || [];
+        const total = items.reduce((s, f) => s + (f.valor || 0), 0);
+        return `<div class="d-flex justify-between align-center mb-2"><h3>📌 Despesas Fixas Mensais</h3><button class="btn btn-primary btn-sm" onclick="Pages.truckDetail.showFixedExpenseForm()">＋ Nova</button></div>
+        <p class="text-muted" style="font-size:0.82rem;margin-bottom:12px">Despesas recorrentes cobradas todo mês para este caminhão (prestação, rastreador, seguro, etc.)</p>
+        ${items.length === 0 ? '<div class="empty-state"><div class="empty-icon">📌</div><h3>Nenhuma despesa fixa cadastrada</h3><p>Adicione despesas que se repetem todo mês.</p></div>' :
+            `<div class="table-container"><table class="data-table"><thead><tr><th>Descrição</th><th>Valor Mensal</th><th></th></tr></thead><tbody>${items.map((e, i) => `<tr>
+                <td class="font-bold">${e.descricao}</td>
+                <td class="font-bold text-danger">${Utils.formatCurrency(e.valor)}</td>
+                <td><button class="btn btn-icon btn-sm" style="color:var(--accent-danger)" onclick="Pages.truckDetail.removeFixedExpense(${i})">🗑️</button></td>
+            </tr>`).join('')}</tbody></table></div>
+            <div class="table-footer"><span>${items.length} despesa${items.length > 1 ? 's' : ''} fixa${items.length > 1 ? 's' : ''}</span><span><strong>Total mensal: ${Utils.formatCurrency(total)}</strong></span></div>`}`;
+    },
+
+    showFixedExpenseForm() {
+        const modal = document.getElementById('modal-overlay');
+        modal.querySelector('.modal-header h2').textContent = 'Nova Despesa Fixa Mensal';
+        modal.querySelector('.modal-body').innerHTML = `
+            <p class="text-muted mb-2">Esta despesa será cobrada automaticamente todo mês no fechamento deste caminhão.</p>
+            <div class="form-group"><label class="form-label">Descrição *</label><input type="text" class="form-control" id="f-descricao" placeholder="Prestação, Rastreador, Seguro, etc."></div>
+            <div class="form-group"><label class="form-label">Valor Mensal R$ *</label><input type="number" step="0.01" class="form-control" id="f-valor" placeholder="0.00"></div>`;
+        modal.querySelector('.modal-footer').innerHTML = `<button class="btn btn-secondary" onclick="App.closeModal()">Cancelar</button><button class="btn btn-primary" onclick="Pages.truckDetail.saveFixedExpense()">Salvar</button>`;
+        App.openModal();
+    },
+
+    async saveFixedExpense() {
+        const descricao = document.getElementById('f-descricao').value.trim();
+        const valor = parseFloat(document.getElementById('f-valor').value) || 0;
+        if (!descricao) { Utils.showToast('Informe a descrição', 'warning'); return; }
+        if (valor <= 0) { Utils.showToast('Informe o valor', 'warning'); return; }
+
+        const items = this._truckData.fixedExpenses || [];
+        items.push({ descricao, valor });
+        await db.setTruckFixedExpenses(this.truckId, items);
+        this._truckData.fixedExpenses = items;
+
+        App.closeModal();
+        // Refresh the fixed tab
+        const tabEl = document.getElementById('tab-fixed');
+        if (tabEl) tabEl.innerHTML = this.renderFixedExpensesTab();
+        // Also refresh stats
+        this.applyTruckFilter();
+        Utils.showToast('Despesa fixa adicionada!', 'success');
+    },
+
+    async removeFixedExpense(index) {
+        if (!confirm('Remover esta despesa fixa?')) return;
+        const items = this._truckData.fixedExpenses || [];
+        items.splice(index, 1);
+        await db.setTruckFixedExpenses(this.truckId, items);
+        this._truckData.fixedExpenses = items;
+
+        const tabEl = document.getElementById('tab-fixed');
+        if (tabEl) tabEl.innerHTML = this.renderFixedExpensesTab();
+        this.applyTruckFilter();
+        Utils.showToast('Despesa fixa removida', 'success');
+
     }
 };
