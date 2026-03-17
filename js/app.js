@@ -131,7 +131,20 @@ const App = {
 
             // ALWAYS listen for auth changes (must be before getSession)
             supabase.auth.onAuthStateChange(async (event, session) => {
-                if (event === 'SIGNED_IN' && session) {
+                if (event === 'PASSWORD_RECOVERY') {
+                    // User arrived from password reset email link
+                    const newPassword = prompt('Digite sua nova senha (mínimo 6 caracteres):');
+                    if (newPassword && newPassword.length >= 6) {
+                        const { error } = await supabase.auth.updateUser({ password: newPassword });
+                        if (error) {
+                            alert('Erro ao alterar senha: ' + error.message);
+                        } else {
+                            alert('Senha alterada com sucesso! Você já está logado.');
+                        }
+                    } else if (newPassword) {
+                        alert('A senha deve ter no mínimo 6 caracteres.');
+                    }
+                } else if (event === 'SIGNED_IN' && session) {
                     db.setUserId(session.user.id);
                     this.userEmail = session.user.email;
                     document.getElementById('login-screen').classList.add('hidden');
@@ -388,6 +401,57 @@ const App = {
         if (confirm('Tem certeza que deseja sair?')) {
             await supabase.auth.signOut();
             window.location.reload();
+        }
+    },
+
+    showForgotPassword() {
+        this._forgotMode = true;
+        document.getElementById('password').style.display = 'none';
+        document.getElementById('password').removeAttribute('required');
+        document.getElementById('login-title').innerText = 'Recuperar Senha';
+        document.getElementById('login-btn-text').innerText = 'Enviar link de redefinição';
+        document.getElementById('login-form').onsubmit = (e) => App.handleResetPassword(e);
+        document.getElementById('forgot-password-link').innerText = 'Voltar ao login';
+        document.getElementById('forgot-password-link').onclick = () => App.showLoginForm();
+        document.getElementById('login-message').innerText = '';
+    },
+
+    showLoginForm() {
+        this._forgotMode = false;
+        document.getElementById('password').style.display = '';
+        document.getElementById('password').setAttribute('required', '');
+        document.getElementById('login-title').innerText = 'Acessar Frota Control';
+        document.getElementById('login-btn-text').innerText = 'Entrar';
+        document.getElementById('login-form').onsubmit = (e) => App.handleLogin(e);
+        document.getElementById('forgot-password-link').innerText = 'Esqueci minha senha';
+        document.getElementById('forgot-password-link').onclick = () => App.showForgotPassword();
+        document.getElementById('login-message').innerText = '';
+    },
+
+    async handleResetPassword(e) {
+        e.preventDefault();
+        const email = document.getElementById('email').value;
+        const msg = document.getElementById('login-message');
+        const btn = document.getElementById('login-btn-text');
+
+        msg.innerText = '';
+        btn.disabled = true;
+        btn.innerText = 'Enviando...';
+
+        try {
+            const redirectUrl = window.location.origin + window.location.pathname;
+            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: redirectUrl
+            });
+            if (error) throw error;
+            msg.style.color = '#10b981';
+            msg.innerText = 'Link de redefinição enviado! Verifique seu e-mail (inclusive lixo eletrônico).';
+        } catch (error) {
+            msg.style.color = '#ef4444';
+            msg.innerText = error.message || 'Erro ao enviar link. Verifique o e-mail.';
+        } finally {
+            btn.disabled = false;
+            btn.innerText = 'Enviar link de redefinição';
         }
     }
 };
