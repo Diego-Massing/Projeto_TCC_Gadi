@@ -136,8 +136,12 @@ Pages.users = {
                 });
 
                 if (signUpError) {
-                    Utils.showToast('Erro ao criar conta: ' + signUpError.message, 'error');
-                    return;
+                    if (signUpError.message.includes('already registered')) {
+                        Utils.showToast('⚠️ E-mail já existe no Auth. Vinculando ao novo usuário.', 'warning');
+                    } else {
+                        Utils.showToast('Erro ao criar conta: ' + signUpError.message, 'error');
+                        return;
+                    }
                 }
 
                 // signUp may auto-login the new user, which would log out the admin
