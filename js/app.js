@@ -148,7 +148,7 @@ const App = {
                     } else if (newPassword) {
                         alert('A senha deve ter no mínimo 6 caracteres.');
                     }
-                } else if (event === 'SIGNED_IN' && session) {
+                } else if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
                     if (!this.initialized) {
                         try {
                             db.setUserId(session.user.id);
@@ -173,7 +173,7 @@ const App = {
                                 }, 300);
                             });
                         } catch (e) {
-                            console.error('Init after SIGNED_IN error:', e);
+                            console.error('Init after auth error:', e);
                             document.getElementById('page-content').innerHTML = `
                                 <div class="text-center text-danger" style="padding:60px 20px">
                                     <div style="font-size:3rem;margin-bottom:16px">⚠️</div>
@@ -190,14 +190,10 @@ const App = {
                     document.getElementById('login-screen').classList.remove('hidden');
                     this.initialized = false;
                     initPromiseResolve();
-                } else if (event === 'INITIAL_SESSION') {
-                    // If no session, show login
-                    if (!session) {
-                        document.getElementById('login-screen').classList.remove('hidden');
-                        this.setupNavigation();
-                        initPromiseResolve();
-                    }
-                    // If session exists, SIGNED_IN will fire next
+                } else if (event === 'INITIAL_SESSION' && !session) {
+                    document.getElementById('login-screen').classList.remove('hidden');
+                    this.setupNavigation();
+                    initPromiseResolve();
                 }
             });
 
