@@ -122,116 +122,91 @@ const App = {
     _navSetup: false,
 
     async init() {
-
         try {
-            // Check if Supabase is configured
             if (typeof supabase === 'undefined' || !supabase) {
                 throw new Error('Supabase não configurado. Verifique js/supabase-config.js');
             }
 
-            // Single init flag to prevent double-init
-            let initPromiseResolve;
-            const initDone = new Promise(r => initPromiseResolve = r);
-
-            // ALWAYS listen for auth changes (must be before getSession)
+            // Listen for future auth changes (sign-out, password recovery, token refresh)
             supabase.auth.onAuthStateChange(async (event, session) => {
+                console.log('Auth event:', event);
                 if (event === 'PASSWORD_RECOVERY') {
-                    // User arrived from password reset email link
                     const newPassword = prompt('Digite sua nova senha (mínimo 6 caracteres):');
                     if (newPassword && newPassword.length >= 6) {
                         const { error } = await supabase.auth.updateUser({ password: newPassword });
-                        if (error) {
-                            alert('Erro ao alterar senha: ' + error.message);
-                        } else {
-                            alert('Senha alterada com sucesso! Você já está logado.');
-                        }
+                        alert(error ? 'Erro: ' + error.message : 'Senha alterada com sucesso!');
                     } else if (newPassword) {
                         alert('A senha deve ter no mínimo 6 caracteres.');
                     }
-                } else if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
-                    if (!this.initialized) {
-                        try {
-                            db.setUserId(session.user.id);
-                            this.userEmail = session.user.email;
-                            document.getElementById('login-screen').classList.add('hidden');
-
-                            await db.init();
-                            await this.loadCurrentUser();
-                            try { await MapsService.loadApiKey(); } catch(e) { console.warn('MapsService init skipped:', e); }
-                            this.setupNavigation();
-                            this.applyRoleRestrictions();
-                            this.initialized = true;
-                            this.navigate(this.userRole === 'motorista' ? 'fuelings' : 'dashboard');
-
-                            let resizeTimeout;
-                            window.addEventListener('resize', () => {
-                                clearTimeout(resizeTimeout);
-                                resizeTimeout = setTimeout(() => {
-                                    if (App.currentPage === 'dashboard' && Pages.dashboard.drawCharts) {
-                                        Pages.dashboard.applyDashboardFilter();
-                                    }
-                                }, 300);
-                            });
-                        } catch (e) {
-                            console.error('Init after auth error:', e);
-                            document.getElementById('page-content').innerHTML = `
-                                <div class="text-center text-danger" style="padding:60px 20px">
-                                    <div style="font-size:3rem;margin-bottom:16px">⚠️</div>
-                                    <h3>Erro ao carregar dados</h3>
-                                    <p>${e.message}</p>
-                                    <button class="btn btn-primary mt-3" onclick="location.reload()">🔄 Tentar novamente</button>
-                                </div>`;
-                        }
-                    } else {
-                        this.refreshCurrentPage();
-                    }
-                    initPromiseResolve();
+                } else if (event === 'SIGNED_IN' && session && !this.initialized) {
+                    // This fires after login (not on refresh in some SDK versions)
+                    await this._doInit(session);
                 } else if (event === 'SIGNED_OUT') {
                     document.getElementById('login-screen').classList.remove('hidden');
                     this.initialized = false;
-                    initPromiseResolve();
-                } else if (event === 'INITIAL_SESSION' && !session) {
-                    document.getElementById('login-screen').classList.remove('hidden');
-                    this.setupNavigation();
-                    initPromiseResolve();
                 }
             });
 
-            // Check existing session (triggers onAuthStateChange)
+            // Check existing session immediately
             const { data, error } = await supabase.auth.getSession();
             if (error) throw error;
 
-            // If no session at all and no event fired yet, show login
-            if (!data?.session) {
+            if (data?.session && !this.initialized) {
+                // Already logged in — init immediately
+                await this._doInit(data.session);
+            } else if (!data?.session) {
+                // No session — show login
                 document.getElementById('login-screen').classList.remove('hidden');
                 this.setupNavigation();
             }
 
-            // Timeout - if nothing happens in 10s, show error
-            setTimeout(() => {
-                if (!this.initialized && document.getElementById('login-screen').classList.contains('hidden')) {
-                    console.error('App init timeout — forcing reload');
-                    document.getElementById('page-content').innerHTML = `
-                        <div class="text-center text-danger" style="padding:60px 20px">
-                            <div style="font-size:3rem;margin-bottom:16px">⏱️</div>
-                            <h3>Tempo esgotado ao carregar</h3>
-                            <p>O sistema demorou demais para responder.</p>
-                            <button class="btn btn-primary mt-3" onclick="location.reload()">🔄 Tentar novamente</button>
-                        </div>`;
-                }
-            }, 10000);
-
         } catch (e) {
             console.error('App Init Error:', e);
-            const pageBody = document.querySelector('.page-body') || document.getElementById('page-content');
-            if (pageBody) pageBody.innerHTML = `
+            const el = document.getElementById('page-content');
+            if (el) el.innerHTML = `
                 <div class="text-center text-danger" style="padding:60px 20px">
                     <div style="font-size:3rem;margin-bottom:16px">⚠️</div>
                     <h3>Erro ao iniciar sistema</h3>
                     <p>${e.message}</p>
-                    <p class="text-muted small mt-2">Verifique o console para mais detalhes.</p>
-                </div>
-            `;
+                    <button class="btn btn-primary mt-3" onclick="location.reload()">🔄 Tentar novamente</button>
+                </div>`;
+        }
+    },
+
+    async _doInit(session) {
+        if (this.initialized) return; // guard against double-init
+        try {
+            db.setUserId(session.user.id);
+            this.userEmail = session.user.email;
+            document.getElementById('login-screen').classList.add('hidden');
+
+            await db.init();
+            await this.loadCurrentUser();
+            try { await MapsService.loadApiKey(); } catch(e) { console.warn('MapsService skipped:', e); }
+            this.setupNavigation();
+            this.applyRoleRestrictions();
+            this.initialized = true;
+            this.navigate(this.userRole === 'motorista' ? 'fuelings' : 'dashboard');
+
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    if (App.currentPage === 'dashboard' && Pages.dashboard.drawCharts) {
+                        Pages.dashboard.applyDashboardFilter();
+                    }
+                }, 300);
+            });
+            console.log('App initialized successfully');
+        } catch (e) {
+            console.error('Init error:', e);
+            document.getElementById('page-content').innerHTML = `
+                <div class="text-center text-danger" style="padding:60px 20px">
+                    <div style="font-size:3rem;margin-bottom:16px">⚠️</div>
+                    <h3>Erro ao carregar dados</h3>
+                    <p>${e.message}</p>
+                    <button class="btn btn-primary mt-3" onclick="location.reload()">🔄 Tentar novamente</button>
+                </div>`;
         }
     },
 
