@@ -86,9 +86,9 @@ Pages.fuelings = {
                 <div class="form-group"><label class="form-label">Data *</label><input type="date" class="form-control" id="f-data" value="${item?.data || new Date().toISOString().split('T')[0]}"></div>
             </div>
             <div class="form-row">
-                <div class="form-group"><label class="form-label">Litros *</label><input type="number" step="0.01" class="form-control" id="f-litros" value="${item?.litros || ''}" oninput="Pages.fuelings.calcTotal()"></div>
-                <div class="form-group"><label class="form-label">Valor/Litro *</label><input type="number" step="0.01" class="form-control" id="f-valorLitro" value="${item?.valorLitro || ''}" oninput="Pages.fuelings.calcTotal()"></div>
-                <div class="form-group"><label class="form-label">Total</label><input type="number" step="0.01" class="form-control" id="f-valorTotal" value="${item?.valorTotal || ''}" readonly style="font-weight:700"></div>
+                <div class="form-group"><label class="form-label">Litros *</label><input type="number" step="0.01" class="form-control" id="f-litros" value="${item?.litros || ''}" oninput="Pages.fuelings.calcFrom('litros')"></div>
+                <div class="form-group"><label class="form-label">Valor/Litro</label><input type="number" step="0.01" class="form-control" id="f-valorLitro" value="${item?.valorLitro || ''}" oninput="Pages.fuelings.calcFrom('valorLitro')" placeholder="Opcional"></div>
+                <div class="form-group"><label class="form-label">Valor Total</label><input type="number" step="0.01" class="form-control" id="f-valorTotal" value="${item?.valorTotal || ''}" oninput="Pages.fuelings.calcFrom('valorTotal')" style="font-weight:700" placeholder="Opcional"></div>
             </div>
             <div class="form-row">
                 <div class="form-group"><label class="form-label">KM Atual</label><input type="number" class="form-control" id="f-km" value="${item?.km || ''}"></div>
@@ -143,16 +143,29 @@ Pages.fuelings = {
         event.target.value = '';
     },
 
-    calcTotal() {
-        const l = parseFloat(document.getElementById('f-litros').value) || 0;
-        const v = parseFloat(document.getElementById('f-valorLitro').value) || 0;
+    calcFrom(source) {
+        const litrosEl = document.getElementById('f-litros');
+        const vlEl = document.getElementById('f-valorLitro');
+        const vtEl = document.getElementById('f-valorTotal');
+        const l = parseFloat(litrosEl.value) || 0;
+        const vl = parseFloat(vlEl.value) || 0;
+        const vt = parseFloat(vtEl.value) || 0;
         const type = document.getElementById('f-tipoComb')?.value;
         let arla = 0;
         if (type !== 'Arla' && document.getElementById('f-valorArla')) {
             arla = parseFloat(document.getElementById('f-valorArla').value) || 0;
         }
-        document.getElementById('f-valorTotal').value = ((l * v) + arla).toFixed(2);
+        if (source === 'valorTotal') {
+            // User typed total -> calculate valor/litro
+            if (l > 0) vlEl.value = ((vt - arla) / l).toFixed(4);
+        } else {
+            // User typed litros or valor/litro -> calculate total
+            if (vl > 0) vtEl.value = ((l * vl) + arla).toFixed(2);
+            else if (l > 0 && vt > 0 && source === 'litros') vlEl.value = ((vt - arla) / l).toFixed(4);
+        }
     },
+
+    calcTotal() { this.calcFrom('valorLitro'); },
 
     _saving: false,
     async save(id) {
@@ -171,7 +184,18 @@ Pages.fuelings = {
             if (valorArla > 0) tipoComb = tipoComb === 'Diesel S-10' ? 'Diesel S-10' : 'Diesel+Arla';
         }
 
-        const data = { truckId, data: document.getElementById('f-data').value, litros: parseFloat(document.getElementById('f-litros').value) || 0, valorLitro: parseFloat(document.getElementById('f-valorLitro').value) || 0, valorTotal: parseFloat(document.getElementById('f-valorTotal').value) || 0, valorArla, km: parseInt(document.getElementById('f-km').value) || 0, posto: document.getElementById('f-posto').value.trim(), tipoComb };
+        let litros = parseFloat(document.getElementById('f-litros').value) || 0;
+        let valorLitro = parseFloat(document.getElementById('f-valorLitro').value) || 0;
+        let valorTotal = parseFloat(document.getElementById('f-valorTotal').value) || 0;
+
+        if (litros <= 0) { Utils.showToast('Informe os litros', 'warning'); this._saving = false; if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Salvar'; } return; }
+        if (valorLitro <= 0 && valorTotal <= 0) { Utils.showToast('Informe o valor por litro ou o valor total', 'warning'); this._saving = false; if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Salvar'; } return; }
+
+        // Auto-compute missing value
+        if (valorTotal > 0 && valorLitro <= 0) valorLitro = parseFloat(((valorTotal - valorArla) / litros).toFixed(4));
+        if (valorLitro > 0 && valorTotal <= 0) valorTotal = parseFloat(((litros * valorLitro) + valorArla).toFixed(2));
+
+        const data = { truckId, data: document.getElementById('f-data').value, litros, valorLitro, valorTotal, valorArla, km: parseInt(document.getElementById('f-km').value) || 0, posto: document.getElementById('f-posto').value.trim(), tipoComb };
         try {
             if (id) { data.id = id; await db.update('fuelings', data); } else { await db.add('fuelings', data); }
 
