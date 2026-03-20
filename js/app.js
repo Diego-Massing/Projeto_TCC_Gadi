@@ -390,19 +390,17 @@ const App = {
                 const { data, error } = await supabase.auth.signUp({ email, password });
                 if (error) throw error;
                 msg.style.color = '#10b981';
-                msg.innerText = 'Conta criada! Verifique seu email ou faça login.';
-                // Auto login might happen depending on Supabase settings, but often needs email verification
                 if (data.session) {
-                    this.init();
+                    // Auto-login happened, onAuthStateChange will handle init
+                    msg.innerText = 'Conta criada! Entrando...';
                 } else {
                     msg.innerText = 'Conta criada! Verifique seu email para confirmar.';
                 }
             } else {
-                // Login
+                // Login — onAuthStateChange will automatically handle init
                 const { data, error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) throw error;
-                // Re-init app to load data and navigate
-                this.init();
+                // onAuthStateChange SIGNED_IN event will fire and init the app
             }
         } catch (error) {
             msg.style.color = '#ef4444';
