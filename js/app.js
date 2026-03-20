@@ -129,6 +129,10 @@ const App = {
                 throw new Error('Supabase não configurado. Verifique js/supabase-config.js');
             }
 
+            // Single init flag to prevent double-init
+            let initPromiseResolve;
+            const initDone = new Promise(r => initPromiseResolve = r);
+
             // ALWAYS listen for auth changes (must be before getSession)
             supabase.auth.onAuthStateChange(async (event, session) => {
                 if (event === 'PASSWORD_RECOVERY') {
@@ -145,71 +149,87 @@ const App = {
                         alert('A senha deve ter no mínimo 6 caracteres.');
                     }
                 } else if (event === 'SIGNED_IN' && session) {
-                    db.setUserId(session.user.id);
-                    this.userEmail = session.user.email;
-                    document.getElementById('login-screen').classList.add('hidden');
-
                     if (!this.initialized) {
-                        await db.init();
-                        await this.loadCurrentUser();
-                        await MapsService.loadApiKey();
-                        this.setupNavigation();
-                        this.applyRoleRestrictions();
-                        this.initialized = true;
-                        this.navigate(this.userRole === 'motorista' ? 'fuelings' : 'dashboard');
+                        try {
+                            db.setUserId(session.user.id);
+                            this.userEmail = session.user.email;
+                            document.getElementById('login-screen').classList.add('hidden');
 
-                        window.addEventListener('resize', () => {
-                            if (App.currentPage === 'dashboard') setTimeout(() => Pages.dashboard.drawCharts && Pages.dashboard.render(), 200);
-                        });
+                            await db.init();
+                            await this.loadCurrentUser();
+                            try { await MapsService.loadApiKey(); } catch(e) { console.warn('MapsService init skipped:', e); }
+                            this.setupNavigation();
+                            this.applyRoleRestrictions();
+                            this.initialized = true;
+                            this.navigate(this.userRole === 'motorista' ? 'fuelings' : 'dashboard');
+
+                            let resizeTimeout;
+                            window.addEventListener('resize', () => {
+                                clearTimeout(resizeTimeout);
+                                resizeTimeout = setTimeout(() => {
+                                    if (App.currentPage === 'dashboard' && Pages.dashboard.drawCharts) {
+                                        Pages.dashboard.applyDashboardFilter();
+                                    }
+                                }, 300);
+                            });
+                        } catch (e) {
+                            console.error('Init after SIGNED_IN error:', e);
+                            document.getElementById('page-content').innerHTML = `
+                                <div class="text-center text-danger" style="padding:60px 20px">
+                                    <div style="font-size:3rem;margin-bottom:16px">⚠️</div>
+                                    <h3>Erro ao carregar dados</h3>
+                                    <p>${e.message}</p>
+                                    <button class="btn btn-primary mt-3" onclick="location.reload()">🔄 Tentar novamente</button>
+                                </div>`;
+                        }
                     } else {
                         this.refreshCurrentPage();
                     }
+                    initPromiseResolve();
                 } else if (event === 'SIGNED_OUT') {
                     document.getElementById('login-screen').classList.remove('hidden');
                     this.initialized = false;
+                    initPromiseResolve();
+                } else if (event === 'INITIAL_SESSION') {
+                    // If no session, show login
+                    if (!session) {
+                        document.getElementById('login-screen').classList.remove('hidden');
+                        this.setupNavigation();
+                        initPromiseResolve();
+                    }
+                    // If session exists, SIGNED_IN will fire next
                 }
             });
 
-            // Check existing session
+            // Check existing session (triggers onAuthStateChange)
             const { data, error } = await supabase.auth.getSession();
             if (error) throw error;
 
-            const session = data?.session;
-
-            if (!session) {
+            // If no session at all and no event fired yet, show login
+            if (!data?.session) {
                 document.getElementById('login-screen').classList.remove('hidden');
                 this.setupNavigation();
-                return;
             }
 
-            // Already logged in — init immediately
-            db.setUserId(session.user.id);
-            this.userEmail = session.user.email;
-            document.getElementById('login-screen').classList.add('hidden');
-
-            await db.init();
-            await this.loadCurrentUser();
-            await MapsService.loadApiKey();
-            this.setupNavigation();
-            this.applyRoleRestrictions();
-            this.navigate(this.userRole === 'motorista' ? 'fuelings' : 'dashboard');
-
-            let resizeTimeout;
-            window.addEventListener('resize', () => {
-                clearTimeout(resizeTimeout);
-                resizeTimeout = setTimeout(() => {
-                    if (App.currentPage === 'dashboard' && Pages.dashboard.drawCharts) {
-                        Pages.dashboard.applyDashboardFilter();
-                    }
-                }, 300);
-            });
-
-            this.initialized = true;
+            // Timeout - if nothing happens in 10s, show error
+            setTimeout(() => {
+                if (!this.initialized && document.getElementById('login-screen').classList.contains('hidden')) {
+                    console.error('App init timeout — forcing reload');
+                    document.getElementById('page-content').innerHTML = `
+                        <div class="text-center text-danger" style="padding:60px 20px">
+                            <div style="font-size:3rem;margin-bottom:16px">⏱️</div>
+                            <h3>Tempo esgotado ao carregar</h3>
+                            <p>O sistema demorou demais para responder.</p>
+                            <button class="btn btn-primary mt-3" onclick="location.reload()">🔄 Tentar novamente</button>
+                        </div>`;
+                }
+            }, 10000);
 
         } catch (e) {
             console.error('App Init Error:', e);
-            document.querySelector('.page-body').innerHTML = `
-                <div class="text-center text-danger">
+            const pageBody = document.querySelector('.page-body') || document.getElementById('page-content');
+            if (pageBody) pageBody.innerHTML = `
+                <div class="text-center text-danger" style="padding:60px 20px">
                     <div style="font-size:3rem;margin-bottom:16px">⚠️</div>
                     <h3>Erro ao iniciar sistema</h3>
                     <p>${e.message}</p>
