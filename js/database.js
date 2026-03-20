@@ -411,7 +411,6 @@ class FrotaDatabase {
         };
 
         // Upsert closing
-        // Check existing by truckId, mes, ano
         const existing = await this.getByIndex('closings', 'truckId_mesAno', [truckId, mes, ano]);
         if (existing && existing.length > 0) {
             closing.id = existing[0].id;
