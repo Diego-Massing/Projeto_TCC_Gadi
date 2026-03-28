@@ -57,10 +57,6 @@ O sistema foi projetado para transportadoras e gestores de frotas que precisam d
 - Registro completo: data, KM, litros, valor/litro, valor total, posto, tipo de combustível
 - **Tipos suportados:** Diesel, Diesel S-10, Arla 32
   - Arla é registrado separadamente e **não entra no cálculo de média km/L**
-- **OCR com IA (opcional):** leitura automática de nota fiscal via foto
-  - Powered by Google Gemini Vision
-  - Extrai: litros, preço/litro, total, nome do posto, data, tipo de combustível e KM
-  - Basta fotografar o cupom fiscal
 - Exportação em CSV
 - Filtragem por período e placa
 - Motoristas veem apenas os abastecimentos do próprio caminhão
@@ -136,7 +132,6 @@ O sistema foi projetado para transportadoras e gestores de frotas que precisam d
 - **Faixas de prêmio por média km/L:** sistema de bonificação por desempenho
   - Ex: ≥ 2,0 km/L → R$100 | ≥ 2,5 km/L → R$200 | ≥ 3,0 km/L → R$350
   - O motorista recebe a faixa mais alta que atingiu
-- **Chave API Gemini:** configuração do OCR para leitura de notas fiscais
 - **Backup/Restore:** exportação e importação de todos os dados em JSON
 - **Reset de dados:** opção para limpar todos os registros
 
@@ -149,7 +144,6 @@ O sistema foi projetado para transportadoras e gestores de frotas que precisam d
 | Frontend | HTML5, CSS3, JavaScript ES6+ (sem frameworks) |
 | Backend / Banco | Supabase (PostgreSQL + Auth + RLS) |
 | Autenticação | Supabase Auth (e-mail e senha) |
-| OCR (opcional) | Google Gemini Vision API (2.5-flash) |
 | Cálculo de Rotas | OSRM — Open Source Routing Machine (gratuito) |
 | Geocodificação | Nominatim / OpenStreetMap (gratuito) |
 | Gráficos | Canvas API (engine customizada, sem bibliotecas externas) |
@@ -176,7 +170,6 @@ Projeto_TCC_Gadi/
 │   ├── utils.js                        # Funções utilitárias (formatação, datas, toasts)
 │   ├── charts.js                       # Engine de gráficos (barras e rosca)
 │   ├── maps.js                         # Integração OSRM + Nominatim
-│   ├── ocr.js                          # OCR via Gemini Vision
 │   ├── pages-main.js                   # Páginas: Dashboard e Caminhões
 │   ├── pages-data.js                   # Páginas: Abastecimentos, Fretes, Multas, Despesas
 │   ├── pages-detail.js                 # Página: Detalhes do Caminhão (abas)
@@ -331,13 +324,6 @@ vercel --prod
 3. Em **Configurações**, defina as taxas R$/KM e percentuais de comissão padrão
 4. Cadastre os caminhões e motoristas em **Usuários**
 
-### OCR (opcional)
-
-Para habilitar a leitura de notas fiscais por foto:
-
-1. Acesse [Google AI Studio](https://aistudio.google.com) e gere uma chave de API gratuita
-2. No sistema, vá em **Configurações → OCR / Gemini** e salve a chave
-
 ---
 
 ## Como Usar
@@ -345,7 +331,7 @@ Para habilitar a leitura de notas fiscais por foto:
 ### Fluxo básico diário
 
 ```
-1. Motorista registra abastecimento (com foto da nota ou manualmente)
+1. Motorista registra abastecimento
    → Sistema atualiza KM do caminhão automaticamente
 
 2. Motorista registra fretes realizados

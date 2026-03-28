@@ -180,7 +180,6 @@ Pages.settings = {
         const rates = await db.getKmRates();
         const comm = await db.getCommissionConfig();
         const faixas = comm.faixasPremioMedia || [];
-        const geminiKey = await this.getGeminiKey();
         document.getElementById('page-content').innerHTML = `
             <div class="page-header"><div class="page-header-row"><div><h1 class="page-title">⚙️ Configurações</h1><p class="page-subtitle">Valores por KM, comissões e integrações</p></div></div></div>
             <div class="page-body">
@@ -229,17 +228,6 @@ Pages.settings = {
                     <p class="text-muted">Ao cadastrar um frete com cidades de origem e destino, o botão "📏 Calcular KM" calculará a distância rodoviária automaticamente.</p>
                     <div class="badge badge-success" style="font-size:0.85rem;padding:6px 12px">✅ Ativo — Sem custo</div>
                 </div></div>
-                <div class="card mb-3"><div class="card-header"><h3>📸 Leitura de Cupom com IA (OCR)</h3></div><div class="card-body">
-                    <p class="text-muted mb-2">Tire uma foto do cupom fiscal e a IA preenche os campos automaticamente. Usa o <strong>Google Gemini Vision</strong>.</p>
-                    <div class="form-group">
-                        <label class="form-label">Chave da API Gemini</label>
-                        <div style="display:flex;gap:8px">
-                            <input type="password" class="form-control" id="s-gemini-key" value="${geminiKey}" placeholder="Cole sua chave aqui..." style="flex:1">
-                            <button class="btn btn-primary" onclick="Pages.settings.saveGeminiKey()">💾 Salvar</button>
-                        </div>
-                        <small class="text-muted mt-1" style="display:block">Obtenha uma chave gratuita em <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--accent-primary)">aistudio.google.com/app/apikey</a></small>
-                    </div>
-                </div></div>
                 <div class="card"><div class="card-header"><h3>🗄️ Dados</h3></div><div class="card-body">
                     <p class="text-muted mb-2">Gerenciamento do banco de dados local.</p>
                     <div class="btn-group">
@@ -250,19 +238,6 @@ Pages.settings = {
                     <input type="file" id="import-json-file" accept=".json" style="display:none" onchange="Pages.settings.importBackup(event)">
                 </div></div>
             </div>`;
-    },
-    async getGeminiKey() {
-        try {
-            const settings = await db.getAll('settings');
-            const setting = settings.find(s => s.key === 'geminiApiKey');
-            return setting ? setting.value : '';
-        } catch (e) { return ''; }
-    },
-    async saveGeminiKey() {
-        const key = document.getElementById('s-gemini-key').value.trim();
-        if (!key) { Utils.showToast('Informe a chave da API', 'warning'); return; }
-        await OCR.setApiKey(key);
-        Utils.showToast('Chave da API Gemini salva! 🎉', 'success');
     },
     async saveRates() {
         const c = parseFloat(document.getElementById('s-km-carregado').value) || 0;

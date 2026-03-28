@@ -238,11 +238,20 @@ Pages.truckDetail = {
 
     renderClosingTab() {
         const { mes, ano } = Utils.getCurrentMonth();
+        // Load saved closings async after render
+        setTimeout(() => this.renderSavedTruckClosings(), 50);
         return `<div class="d-flex gap-2 align-center mb-2">
             <div class="form-group"><label class="form-label">Mês</label><select class="form-control" id="closing-mes">${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}" ${i + 1 === mes ? 'selected' : ''}>${Utils.getMonthName(i + 1)}</option>`).join('')}</select></div>
             <div class="form-group"><label class="form-label">Ano</label><input type="number" class="form-control" id="closing-ano" value="${ano}" style="width:100px"></div>
             <button class="btn btn-primary" onclick="Pages.truckDetail.generateClosing()" style="margin-top:16px">📊 Gerar Fechamento</button>
-        </div><div id="closing-result"></div>`;
+        </div>
+        <div id="closing-result"></div>
+        <div id="tc-saved-section" style="display:none;margin-top:24px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                <h4 style="margin:0;font-size:0.95rem;color:var(--text-secondary)">📁 Fechamentos Salvos</h4>
+            </div>
+            <div id="tc-saved-closings"></div>
+        </div>`;
     },
 
     async generateClosing() {
@@ -255,6 +264,42 @@ Pages.truckDetail = {
 
         const dci = closing.driverClosingInfo;
 
+        // Load driver closings for the selector (drivers linked to this truck)
+        const driversOfTruck = await db.getByIndex('users', 'truckId', this.truckId);
+        const allDriverClosings = [];
+        for (const d of driversOfTruck) {
+            const closings = await db.getDriverClosingsByDriver(d.id);
+            allDriverClosings.push(...closings);
+        }
+        allDriverClosings.sort((a, b) => b.dataInicio?.localeCompare(a.dataInicio || '') || 0);
+
+        const driverSelectorHtml = `
+            <div id="tc-driver-closing-box" style="margin-bottom:12px;padding:12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:var(--radius-md)">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                    <span style="font-weight:600;font-size:0.88rem">👤 Salário do Motorista</span>
+                    ${dci ? `<span style="font-size:0.8rem;color:var(--text-muted)">Auto-vinculado</span>` : ''}
+                </div>
+                ${dci ? `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+                    <span style="font-size:0.85rem">${dci.driverName} — ${Utils.formatDate(dci.dataInicio)} a ${Utils.formatDate(dci.dataFim)} — <strong>${Utils.formatCurrency(dci.totalSemVales)}</strong> (custo s/ vales)</span>
+                    <button class="btn btn-sm btn-secondary" onclick="Pages.truckDetail.openDriverClosingSelector()" style="white-space:nowrap">Alterar</button>
+                </div>` : `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+                    <span style="font-size:0.82rem;color:var(--text-muted)">Nenhum fechamento do motorista vinculado a este mês.</span>
+                    <button class="btn btn-sm btn-primary" onclick="Pages.truckDetail.openDriverClosingSelector()" style="white-space:nowrap">Incluir</button>
+                </div>`}
+                ${allDriverClosings.length > 0 ? `
+                <div id="tc-driver-selector" style="display:none;margin-top:10px;border-top:1px solid var(--border-color);padding-top:10px">
+                    <label class="form-label" style="font-size:0.8rem">Selecione o fechamento do motorista:</label>
+                    <div style="display:flex;gap:8px;align-items:center">
+                        <select class="form-control" id="tc-driver-closing-select" style="flex:1">
+                            <option value="">— Nenhum —</option>
+                            ${allDriverClosings.map(dc => `<option value="${dc.id}">${dc.driverName} | ${Utils.formatDate(dc.dataInicio)} a ${Utils.formatDate(dc.dataFim)} | ${Utils.formatCurrency(dc.totalSemVales)} (s/vales)</option>`).join('')}
+                        </select>
+                        <button class="btn btn-primary btn-sm" onclick="Pages.truckDetail.applyDriverClosing()">Aplicar</button>
+                        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('tc-driver-selector').style.display='none'">Cancelar</button>
+                    </div>
+                </div>` : ''}
+            </div>`;
+
         document.getElementById('closing-result').innerHTML = `
             <div class="closing-summary animate-in">
                 <div class="closing-item"><div class="closing-label">Abastecimentos (${closing.qtdAbastecimentos})</div><div class="closing-value text-danger">${Utils.formatCurrency(closing.totalAbastecimento)}</div></div>
@@ -262,14 +307,17 @@ Pages.truckDetail = {
                 <div class="closing-item"><div class="closing-label">Multas (${closing.qtdMultas})</div><div class="closing-value text-warning">${Utils.formatCurrency(closing.totalMultas)}</div></div>
                 <div class="closing-item"><div class="closing-label">Despesas (${closing.qtdDespesas})</div><div class="closing-value text-danger">${Utils.formatCurrency(closing.totalDespesas)}</div></div>
                 ${closing.totalDespesasFixas > 0 ? `<div class="closing-item"><div class="closing-label">Desp. Fixas (${(closing.fixedExpenses || []).length})</div><div class="closing-value text-danger">${Utils.formatCurrency(closing.totalDespesasFixas)}</div></div>` : ''}
-                ${dci ? `<div class="closing-item" title="Fechamento de ${Utils.formatDate(dci.dataInicio)} a ${Utils.formatDate(dci.dataFim)}"><div class="closing-label">👤 Sal. ${dci.driverName.split(' ')[0]}</div><div class="closing-value text-danger">${Utils.formatCurrency(dci.totalSemVales)}</div></div>` : ''}
-                <div class="closing-item ${closing.saldo >= 0 ? 'positive' : 'negative'}"><div class="closing-label">Saldo</div><div class="closing-value">${Utils.formatCurrency(closing.saldo)}</div></div>
+                <div class="closing-item" id="tc-salary-card" ${!dci ? 'style="display:none"' : ''} title="${dci ? `Fechamento de ${Utils.formatDate(dci.dataInicio)} a ${Utils.formatDate(dci.dataFim)}` : ''}"><div class="closing-label">👤 Sal. Motorista</div><div class="closing-value text-danger" id="tc-salary-value">${Utils.formatCurrency(closing.totalSalarioMotorista)}</div></div>
+                <div class="closing-item ${closing.saldo >= 0 ? 'positive' : 'negative'}" id="tc-saldo-card"><div class="closing-label">Saldo</div><div class="closing-value" id="tc-saldo-value">${Utils.formatCurrency(closing.saldo)}</div></div>
                 <div class="closing-item"><div class="closing-label">Litros</div><div class="closing-value" id="truck-closing-litros">${Utils.formatNumber(closing.totalLitros, 1)}</div></div>
                 <div class="closing-item"><div class="closing-label">Média km/L</div><div class="closing-value" id="truck-closing-media">${closing.mediaConsumo}</div></div>
             </div>
-            ${dci ? `<div style="margin-bottom:12px;padding:8px 12px;background:rgba(99,102,241,0.08);border-left:3px solid var(--accent-primary);border-radius:var(--radius-sm);font-size:0.82rem;color:var(--text-secondary)">
-                💼 Salário de <strong>${dci.driverName}</strong> incluído no saldo — ${Utils.formatDate(dci.dataInicio)} a ${Utils.formatDate(dci.dataFim)} — <strong>${Utils.formatCurrency(dci.totalSemVales)}</strong> (sem vales)
-            </div>` : ''}
+
+            ${driverSelectorHtml}
+
+            <div style="margin-bottom:16px">
+                <button class="btn btn-success" onclick="Pages.truckDetail.saveTruckClosing()">💾 Salvar Fechamento</button>
+            </div>
 
             ${sortedFuelings.length >= 2 ? `
             <div class="card mt-3" style="border:2px solid var(--accent-success);background:rgba(34,197,94,0.03)">
@@ -297,7 +345,130 @@ Pages.truckDetail = {
             <p class="text-muted" style="font-size:0.78rem;margin-top:12px">Gerado em ${new Date(closing.geradoEm).toLocaleString('pt-BR')}</p>`;
 
         if (sortedFuelings.length >= 2) this.recalcTruckMedia();
+        await this.renderSavedTruckClosings();
         Utils.showToast('Fechamento gerado!', 'success');
+    },
+
+    openDriverClosingSelector() {
+        const selector = document.getElementById('tc-driver-selector');
+        if (selector) selector.style.display = selector.style.display === 'none' ? 'block' : 'none';
+    },
+
+    async applyDriverClosing() {
+        const selectEl = document.getElementById('tc-driver-closing-select');
+        if (!selectEl) return;
+        const closing = this._lastTruckClosing;
+        if (!closing) return;
+
+        const selectedId = parseInt(selectEl.value);
+        if (!selectedId) {
+            // Remove driver closing
+            closing.driverClosingInfo = null;
+            closing.totalSalarioMotorista = 0;
+        } else {
+            const dci = await db.getById('driverClosings', selectedId);
+            if (!dci) { Utils.showToast('Fechamento não encontrado', 'error'); return; }
+            closing.driverClosingInfo = dci;
+            closing.totalSalarioMotorista = dci.totalSemVales || 0;
+        }
+
+        // Recalculate saldo
+        closing.saldo = closing.totalFretes - closing.totalAbastecimento - closing.totalMultas - closing.totalDespesas - closing.totalDespesasFixas - closing.totalSalarioMotorista;
+
+        // Update UI cards
+        const salaryCard = document.getElementById('tc-salary-card');
+        const salaryValue = document.getElementById('tc-salary-value');
+        const saldoValue = document.getElementById('tc-saldo-value');
+        const saldoCard = document.getElementById('tc-saldo-card');
+        const driverBox = document.getElementById('tc-driver-closing-box');
+
+        if (salaryCard) salaryCard.style.display = closing.totalSalarioMotorista > 0 ? '' : 'none';
+        if (salaryValue) salaryValue.textContent = Utils.formatCurrency(closing.totalSalarioMotorista);
+        if (saldoValue) saldoValue.textContent = Utils.formatCurrency(closing.saldo);
+        if (saldoCard) {
+            saldoCard.classList.remove('positive', 'negative');
+            saldoCard.classList.add(closing.saldo >= 0 ? 'positive' : 'negative');
+        }
+        if (driverBox && closing.driverClosingInfo) {
+            const dci = closing.driverClosingInfo;
+            driverBox.querySelector('div:nth-child(2)').innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+                <span style="font-size:0.85rem">${dci.driverName} — ${Utils.formatDate(dci.dataInicio)} a ${Utils.formatDate(dci.dataFim)} — <strong>${Utils.formatCurrency(dci.totalSemVales)}</strong> (custo s/ vales)</span>
+                <button class="btn btn-sm btn-secondary" onclick="Pages.truckDetail.openDriverClosingSelector()" style="white-space:nowrap">Alterar</button>
+            </div>`;
+        }
+
+        document.getElementById('tc-driver-selector').style.display = 'none';
+        Utils.showToast('Salário do motorista atualizado!', 'success');
+    },
+
+    async saveTruckClosing() {
+        const closing = this._lastTruckClosing;
+        if (!closing) { Utils.showToast('Gere o fechamento primeiro', 'warning'); return; }
+
+        const existing = await db.getExistingTruckClosing(closing.truckId, closing.mes, closing.ano);
+        if (existing) {
+            const ok = confirm(`Já existe um fechamento salvo para ${closing.placa} em ${Utils.getMonthName(closing.mes)}/${closing.ano}.\n\nDeseja substituir?`);
+            if (!ok) return;
+        }
+
+        try {
+            const result = await db.saveTruckClosing(closing);
+            Utils.showToast(result.replaced ? 'Fechamento atualizado!' : 'Fechamento salvo!', 'success');
+            await this.renderSavedTruckClosings();
+        } catch(e) {
+            console.error('Erro ao salvar fechamento do caminhão:', e);
+            Utils.showToast('Erro ao salvar: ' + e.message, 'error');
+        }
+    },
+
+    async renderSavedTruckClosings() {
+        const section = document.getElementById('tc-saved-section');
+        const container = document.getElementById('tc-saved-closings');
+        if (!section || !container) return;
+
+        const saved = await db.getSavedTruckClosings(this.truckId);
+        if (!saved.length) {
+            section.style.display = 'none';
+            return;
+        }
+
+        section.style.display = 'block';
+        container.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.83rem">
+            <thead><tr style="border-bottom:1px solid var(--border-color)">
+                <th style="padding:8px 12px;text-align:left;color:var(--text-muted);font-weight:600;font-size:0.75rem;text-transform:uppercase;white-space:nowrap">Período</th>
+                <th style="padding:8px 12px;text-align:right;color:var(--text-muted);font-weight:600;font-size:0.75rem;text-transform:uppercase;white-space:nowrap">Fretes</th>
+                <th style="padding:8px 12px;text-align:right;color:var(--text-muted);font-weight:600;font-size:0.75rem;text-transform:uppercase;white-space:nowrap">Despesas</th>
+                <th style="padding:8px 12px;text-align:right;color:var(--text-muted);font-weight:600;font-size:0.75rem;text-transform:uppercase;white-space:nowrap">Saldo</th>
+                <th style="padding:8px 12px;text-align:left;color:var(--text-muted);font-weight:600;font-size:0.75rem;text-transform:uppercase;white-space:nowrap">Salvo em</th>
+                <th style="padding:8px 12px;width:50px"></th>
+            </tr></thead>
+            <tbody>
+                ${saved.map(s => {
+                    const totalDesp = (s.totalAbastecimento || 0) + (s.totalMultas || 0) + (s.totalDespesas || 0) + (s.totalDespesasFixas || 0) + (s.totalSalarioMotorista || 0);
+                    return `<tr style="border-bottom:1px solid var(--border-color)">
+                        <td style="padding:9px 12px;white-space:nowrap">${Utils.getMonthName(s.mes)}/${s.ano}</td>
+                        <td style="padding:9px 12px;text-align:right;font-weight:700;color:var(--accent-success)">${Utils.formatCurrency(s.totalFretes)}</td>
+                        <td style="padding:9px 12px;text-align:right;color:var(--accent-danger)">${Utils.formatCurrency(totalDesp)}</td>
+                        <td style="padding:9px 12px;text-align:right;font-weight:700;${s.saldo >= 0 ? 'color:var(--accent-success)' : 'color:var(--accent-danger)'}">${Utils.formatCurrency(s.saldo)}</td>
+                        <td style="padding:9px 12px;color:var(--text-muted);white-space:nowrap">${new Date(s.created_at).toLocaleDateString('pt-BR')}</td>
+                        <td style="padding:9px 12px;text-align:right;white-space:nowrap">
+                            <button class="btn-icon" onclick="Pages.truckDetail.deleteSavedTruckClosing(${s.id})" title="Excluir" style="color:var(--accent-danger);font-size:14px">🗑️</button>
+                        </td>
+                    </tr>`;
+                }).join('')}
+            </tbody>
+        </table>`;
+    },
+
+    async deleteSavedTruckClosing(id) {
+        if (!confirm('Excluir este fechamento salvo?')) return;
+        try {
+            await db.delete('truckClosings', id);
+            await this.renderSavedTruckClosings();
+            Utils.showToast('Fechamento excluído', 'info');
+        } catch(e) {
+            Utils.showToast('Erro ao excluir: ' + e.message, 'error');
+        }
     },
 
     recalcTruckMedia() {

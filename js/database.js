@@ -40,10 +40,11 @@ class FrotaDatabase {
                     storeName === 'driverBonuses' ? 'driver_bonuses' :
                         storeName === 'driverDiscounts' ? 'driver_discounts' :
                             storeName === 'driverClosings' ? 'driver_closings' :
-                                storeName === 'maintenancePlans' ? 'maintenance_plans' :
-                                    storeName === 'tires' ? 'tires' :
-                                        storeName === 'tiresHistory' ? 'tires_history' :
-                                            storeName;
+                                storeName === 'truckClosings' ? 'truck_closings' :
+                                    storeName === 'maintenancePlans' ? 'maintenance_plans' :
+                                        storeName === 'tires' ? 'tires' :
+                                            storeName === 'tiresHistory' ? 'tires_history' :
+                                                storeName;
 
         const { data: inserted, error } = await supabase
             .from(table)
@@ -66,10 +67,11 @@ class FrotaDatabase {
                     storeName === 'driverBonuses' ? 'driver_bonuses' :
                         storeName === 'driverDiscounts' ? 'driver_discounts' :
                             storeName === 'driverClosings' ? 'driver_closings' :
-                                storeName === 'maintenancePlans' ? 'maintenance_plans' :
-                                    storeName === 'tires' ? 'tires' :
-                                        storeName === 'tiresHistory' ? 'tires_history' :
-                                            storeName;
+                                storeName === 'truckClosings' ? 'truck_closings' :
+                                    storeName === 'maintenancePlans' ? 'maintenance_plans' :
+                                        storeName === 'tires' ? 'tires' :
+                                            storeName === 'tiresHistory' ? 'tires_history' :
+                                                storeName;
 
         const { data: updated, error } = await supabase
             .from(table)
@@ -94,10 +96,11 @@ class FrotaDatabase {
                     storeName === 'driverBonuses' ? 'driver_bonuses' :
                         storeName === 'driverDiscounts' ? 'driver_discounts' :
                             storeName === 'driverClosings' ? 'driver_closings' :
-                                storeName === 'maintenancePlans' ? 'maintenance_plans' :
-                                    storeName === 'tires' ? 'tires' :
-                                        storeName === 'tiresHistory' ? 'tires_history' :
-                                            storeName;
+                                storeName === 'truckClosings' ? 'truck_closings' :
+                                    storeName === 'maintenancePlans' ? 'maintenance_plans' :
+                                        storeName === 'tires' ? 'tires' :
+                                            storeName === 'tiresHistory' ? 'tires_history' :
+                                                storeName;
 
         const { error } = await supabase.from(table).delete().eq('id', id);
         if (error) { console.error(`Error deleting from ${storeName}:`, error); throw error; }
@@ -112,10 +115,11 @@ class FrotaDatabase {
                     storeName === 'driverBonuses' ? 'driver_bonuses' :
                         storeName === 'driverDiscounts' ? 'driver_discounts' :
                             storeName === 'driverClosings' ? 'driver_closings' :
-                                storeName === 'maintenancePlans' ? 'maintenance_plans' :
-                                    storeName === 'tires' ? 'tires' :
-                                        storeName === 'tiresHistory' ? 'tires_history' :
-                                            storeName;
+                                storeName === 'truckClosings' ? 'truck_closings' :
+                                    storeName === 'maintenancePlans' ? 'maintenance_plans' :
+                                        storeName === 'tires' ? 'tires' :
+                                            storeName === 'tiresHistory' ? 'tires_history' :
+                                                storeName;
 
         const { data, error } = await supabase.from(table).select().eq('id', id).single();
         if (error) return null; // Not found or error
@@ -136,10 +140,11 @@ class FrotaDatabase {
                     storeName === 'driverBonuses' ? 'driver_bonuses' :
                         storeName === 'driverDiscounts' ? 'driver_discounts' :
                             storeName === 'driverClosings' ? 'driver_closings' :
-                                storeName === 'maintenancePlans' ? 'maintenance_plans' :
-                                    storeName === 'tires' ? 'tires' :
-                                        storeName === 'tiresHistory' ? 'tires_history' :
-                                            storeName;
+                                storeName === 'truckClosings' ? 'truck_closings' :
+                                    storeName === 'maintenancePlans' ? 'maintenance_plans' :
+                                        storeName === 'tires' ? 'tires' :
+                                            storeName === 'tiresHistory' ? 'tires_history' :
+                                                storeName;
 
         const { data, error } = await supabase.from(table).select('*');
         if (error) { console.error(`Error getting all ${storeName}:`, error); return []; }
@@ -439,6 +444,63 @@ class FrotaDatabase {
         return data[0];
     }
 
+    // ===== TRUCK CLOSINGS: Save & Query =====
+
+    async saveTruckClosing(closingData) {
+        const payload = {
+            truckId: closingData.truckId,
+            placa: closingData.placa || '',
+            mes: closingData.mes,
+            ano: closingData.ano,
+            totalAbastecimento: closingData.totalAbastecimento || 0,
+            totalFretes: closingData.totalFretes || 0,
+            totalMultas: closingData.totalMultas || 0,
+            totalDespesas: closingData.totalDespesas || 0,
+            totalDespesasFixas: closingData.totalDespesasFixas || 0,
+            totalSalarioMotorista: closingData.totalSalarioMotorista || 0,
+            saldo: closingData.saldo || 0,
+            mediaConsumo: closingData.mediaConsumo || 0,
+            totalLitros: closingData.totalLitros || 0,
+            totalKm: closingData.totalKm || 0,
+            driverName: closingData.driverClosingInfo?.driverName || null,
+            driverClosingId: closingData.driverClosingInfo?.id || null,
+            geradoEm: new Date().toISOString()
+        };
+
+        const existing = await this.getExistingTruckClosing(closingData.truckId, closingData.mes, closingData.ano);
+        if (existing) {
+            payload.id = existing.id;
+            await this.update('truckClosings', payload);
+            return { ...payload, replaced: true };
+        } else {
+            const id = await this.add('truckClosings', payload);
+            return { ...payload, id, replaced: false };
+        }
+    }
+
+    async getExistingTruckClosing(truckId, mes, ano) {
+        const { data, error } = await supabase
+            .from('truck_closings')
+            .select('*')
+            .eq('truckId', truckId)
+            .eq('mes', mes)
+            .eq('ano', ano)
+            .maybeSingle();
+        if (error) return null;
+        return data;
+    }
+
+    async getSavedTruckClosings(truckId) {
+        const { data, error } = await supabase
+            .from('truck_closings')
+            .select('*')
+            .eq('truckId', truckId)
+            .order('ano', { ascending: false })
+            .order('mes', { ascending: false });
+        if (error) return [];
+        return data || [];
+    }
+
     // Core Business Logic: Monthly Closing
     async generateMonthlyClosing(truckId, mes, ano) {
         const fuelings = await this.getDataByTruckAndMonth('fuelings', truckId, mes, ano);
@@ -492,14 +554,6 @@ class FrotaDatabase {
             geradoEm: new Date().toISOString()
         };
 
-        // Upsert closing
-        const existing = await this.getByIndex('closings', 'truckId_mesAno', [truckId, mes, ano]);
-        if (existing && existing.length > 0) {
-            closing.id = existing[0].id;
-            await this.update('closings', closing);
-        } else {
-            await this.add('closings', closing);
-        }
         return closing;
     }
 

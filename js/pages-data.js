@@ -73,14 +73,6 @@ Pages.fuelings = {
         const modal = document.getElementById('modal-overlay');
         modal.querySelector('.modal-header h2').textContent = id ? 'Editar Abastecimento' : 'Novo Abastecimento';
         modal.querySelector('.modal-body').innerHTML = `
-            <div style="margin-bottom:16px">
-                <input type="file" id="receipt-upload" accept="image/*" capture="environment" style="display:none" onchange="Pages.fuelings.handleReceiptUpload(event)">
-                <button class="btn btn-success" onclick="document.getElementById('receipt-upload').click()" style="width:100%;padding:14px;font-size:1rem">
-                    📸 Ler Cupom Fiscal com IA
-                </button>
-                <div id="ocr-status" style="margin-top:8px;font-size:0.85rem;text-align:center"></div>
-            </div>
-            <hr style="border-color:#333;margin:0 0 16px 0">
             <div class="form-row">
                 <div class="form-group"><label class="form-label">Caminhão *</label><select class="form-control" id="f-truckId" ${App.userRole === 'motorista' ? 'disabled' : ''}><option value="">Selecione</option>${trucks.map(t => `<option value="${t.id}" ${(item?.truckId === t.id || presetTruckId === t.id || (App.userRole === 'motorista' && App.userTruckId === t.id)) ? 'selected' : ''}>${t.placa}</option>`).join('')}</select></div>
                 <div class="form-group"><label class="form-label">Data *</label><input type="date" class="form-control" id="f-data" value="${item?.data || new Date().toISOString().split('T')[0]}"></div>
@@ -113,34 +105,6 @@ Pages.fuelings = {
             container.style.display = (type === 'Diesel' || type === 'Diesel S-10' || type === 'Diesel+Arla') ? 'flex' : 'none';
         }
         this.calcTotal();
-    },
-
-    async handleReceiptUpload(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        const statusEl = document.getElementById('ocr-status');
-        statusEl.innerHTML = '<span style="color:#6366f1">🔄 Analisando cupom com IA... aguarde</span>';
-
-        try {
-            await OCR.loadApiKey();
-            const data = await OCR.extractFromReceipt(file);
-            const filled = OCR.fillFuelingForm(data);
-            statusEl.innerHTML = `<span style="color:#22c55e">✅ ${filled} campos preenchidos automaticamente!</span>`;
-
-            // Show extracted data summary
-            const parts = [];
-            if (data.litros) parts.push(`${data.litros}L`);
-            if (data.valorTotal) parts.push(`R$${data.valorTotal}`);
-            if (data.posto) parts.push(data.posto);
-            if (parts.length) statusEl.innerHTML += `<br><span style="color:#94a3b8;font-size:0.8rem">${parts.join(' • ')}</span>`;
-        } catch (e) {
-            console.error('OCR Error:', e);
-            statusEl.innerHTML = `<span style="color:#ef4444">❌ ${e.message}</span>`;
-        }
-
-        // Reset file input so same file can be re-selected
-        event.target.value = '';
     },
 
     calcFrom(source) {
