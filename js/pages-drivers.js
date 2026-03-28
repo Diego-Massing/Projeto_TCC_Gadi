@@ -444,21 +444,24 @@ Pages.driverClosing = {
             return;
         }
 
-        container.innerHTML = `<table class="data-table" style="font-size:0.85rem">
-            <thead><tr>
-                <th>Período</th>
-                <th class="text-right">Total a Pagar</th>
-                <th class="text-right">Custo s/ Vales</th>
-                <th>Salvo em</th>
-                <th></th>
+        container.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.83rem">
+            <thead><tr style="border-bottom:1px solid var(--border-color)">
+                <th style="padding:8px 12px;text-align:left;color:var(--text-muted);font-weight:600;font-size:0.75rem;text-transform:uppercase;white-space:nowrap">Período</th>
+                <th style="padding:8px 12px;text-align:right;color:var(--text-muted);font-weight:600;font-size:0.75rem;text-transform:uppercase;white-space:nowrap">Total a Pagar</th>
+                <th style="padding:8px 12px;text-align:right;color:var(--text-muted);font-weight:600;font-size:0.75rem;text-transform:uppercase;white-space:nowrap">Custo s/ Vales</th>
+                <th style="padding:8px 12px;text-align:left;color:var(--text-muted);font-weight:600;font-size:0.75rem;text-transform:uppercase;white-space:nowrap">Salvo em</th>
+                <th style="padding:8px 12px;width:70px"></th>
             </tr></thead>
             <tbody>
-                ${saved.map(s => `<tr>
-                    <td>${Utils.formatDate(s.dataInicio)} a ${Utils.formatDate(s.dataFim)}</td>
-                    <td class="text-right font-bold text-success">${Utils.formatCurrency(s.totalPagar)}</td>
-                    <td class="text-right font-bold">${Utils.formatCurrency(s.totalSemVales)}</td>
-                    <td style="color:var(--text-muted)">${new Date(s.created_at).toLocaleDateString('pt-BR')}</td>
-                    <td style="text-align:right"><button class="btn-icon" style="color:var(--accent-danger);font-size:12px" onclick="Pages.driverClosing.deleteSavedClosing(${s.id}, ${driverId})" title="Excluir">🗑️</button></td>
+                ${saved.map(s => `<tr style="border-bottom:1px solid var(--border-color)">
+                    <td style="padding:9px 12px;white-space:nowrap">${Utils.formatDate(s.dataInicio)} a ${Utils.formatDate(s.dataFim)}</td>
+                    <td style="padding:9px 12px;text-align:right;font-weight:700;color:var(--accent-success)">${Utils.formatCurrency(s.totalPagar)}</td>
+                    <td style="padding:9px 12px;text-align:right;font-weight:700">${Utils.formatCurrency(s.totalSemVales)}</td>
+                    <td style="padding:9px 12px;color:var(--text-muted);white-space:nowrap">${new Date(s.created_at).toLocaleDateString('pt-BR')}</td>
+                    <td style="padding:9px 12px;text-align:right;white-space:nowrap">
+                        <button class="btn-icon" onclick="Pages.driverClosing.exportSavedPDF(${s.id})" title="Exportar PDF" style="font-size:14px;margin-right:4px">📄</button>
+                        <button class="btn-icon" onclick="Pages.driverClosing.deleteSavedClosing(${s.id}, ${driverId})" title="Excluir" style="color:var(--accent-danger);font-size:14px">🗑️</button>
+                    </td>
                 </tr>`).join('')}
             </tbody>
         </table>`;
@@ -472,6 +475,24 @@ Pages.driverClosing = {
             Utils.showToast('Fechamento excluído', 'info');
         } catch(e) {
             Utils.showToast('Erro ao excluir: ' + e.message, 'error');
+        }
+    },
+
+    async exportSavedPDF(savedId) {
+        const saved = await db.getById('driverClosings', savedId);
+        if (!saved) { Utils.showToast('Fechamento não encontrado', 'warning'); return; }
+
+        Utils.showToast('Gerando PDF...', 'info');
+        try {
+            const closingData = await db.generateDriverClosingByDateRange(
+                saved.driverId, saved.dataInicio, saved.dataFim,
+                saved.diasTrabalhados, saved.diasNoMes
+            );
+            if (!closingData) { Utils.showToast('Erro ao carregar dados do fechamento', 'error'); return; }
+            this._lastClosing = closingData;
+            this.exportPDF();
+        } catch(e) {
+            Utils.showToast('Erro ao gerar PDF: ' + e.message, 'error');
         }
     },
 
