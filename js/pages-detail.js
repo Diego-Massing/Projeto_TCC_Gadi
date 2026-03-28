@@ -237,12 +237,15 @@ Pages.truckDetail = {
     },
 
     renderClosingTab() {
-        const { mes, ano } = Utils.getCurrentMonth();
+        // Default: first day of current month to today
+        const today = new Date();
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+        const todayStr = today.toISOString().split('T')[0];
         // Load saved closings async after render
         setTimeout(() => this.renderSavedTruckClosings(), 50);
-        return `<div class="d-flex gap-2 align-center mb-2">
-            <div class="form-group"><label class="form-label">Mês</label><select class="form-control" id="closing-mes">${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}" ${i + 1 === mes ? 'selected' : ''}>${Utils.getMonthName(i + 1)}</option>`).join('')}</select></div>
-            <div class="form-group"><label class="form-label">Ano</label><input type="number" class="form-control" id="closing-ano" value="${ano}" style="width:100px"></div>
+        return `<div class="d-flex gap-2 align-center mb-2" style="flex-wrap:wrap">
+            <div class="form-group"><label class="form-label">De</label><input type="date" class="form-control" id="closing-data-inicio" value="${firstDay}"></div>
+            <div class="form-group"><label class="form-label">Até</label><input type="date" class="form-control" id="closing-data-fim" value="${todayStr}"></div>
             <button class="btn btn-primary" onclick="Pages.truckDetail.generateClosing()" style="margin-top:16px">📊 Gerar Fechamento</button>
         </div>
         <div id="closing-result"></div>
@@ -255,9 +258,11 @@ Pages.truckDetail = {
     },
 
     async generateClosing() {
-        const mes = parseInt(document.getElementById('closing-mes').value);
-        const ano = parseInt(document.getElementById('closing-ano').value);
-        const closing = await db.generateMonthlyClosing(this.truckId, mes, ano);
+        const dataInicio = document.getElementById('closing-data-inicio').value;
+        const dataFim = document.getElementById('closing-data-fim').value;
+        if (!dataInicio || !dataFim) { Utils.showToast('Informe o período (De e Até)', 'warning'); return; }
+        if (dataFim < dataInicio) { Utils.showToast('A data "Até" deve ser maior ou igual à data "De"', 'warning'); return; }
+        const closing = await db.generateTruckClosingByDateRange(this.truckId, dataInicio, dataFim);
         this._lastTruckClosing = closing;
         const allFuelings = closing.fuelingsForMedia || closing.fuelings || [];
         const sortedFuelings = allFuelings.filter(f => f.km > 0 && f.tipoComb !== 'Arla').sort((a, b) => (a.data || '').localeCompare(b.data || '') || (a.km - b.km));
@@ -405,9 +410,9 @@ Pages.truckDetail = {
         const closing = this._lastTruckClosing;
         if (!closing) { Utils.showToast('Gere o fechamento primeiro', 'warning'); return; }
 
-        const existing = await db.getExistingTruckClosing(closing.truckId, closing.mes, closing.ano);
+        const existing = await db.getExistingTruckClosing(closing.truckId, closing.dataInicio, closing.dataFim);
         if (existing) {
-            const ok = confirm(`Já existe um fechamento salvo para ${closing.placa} em ${Utils.getMonthName(closing.mes)}/${closing.ano}.\n\nDeseja substituir?`);
+            const ok = confirm(`Já existe um fechamento salvo para ${closing.placa} no período ${Utils.formatDate(closing.dataInicio)} a ${Utils.formatDate(closing.dataFim)}.\n\nDeseja substituir?`);
             if (!ok) return;
         }
 
@@ -446,7 +451,7 @@ Pages.truckDetail = {
                 ${saved.map(s => {
                     const totalDesp = (s.totalAbastecimento || 0) + (s.totalMultas || 0) + (s.totalDespesas || 0) + (s.totalDespesasFixas || 0) + (s.totalSalarioMotorista || 0);
                     return `<tr style="border-bottom:1px solid var(--border-color)">
-                        <td style="padding:9px 12px;white-space:nowrap">${Utils.getMonthName(s.mes)}/${s.ano}</td>
+                        <td style="padding:9px 12px;white-space:nowrap">${Utils.formatDate(s.dataInicio)} a ${Utils.formatDate(s.dataFim)}</td>
                         <td style="padding:9px 12px;text-align:right;font-weight:700;color:var(--accent-success)">${Utils.formatCurrency(s.totalFretes)}</td>
                         <td style="padding:9px 12px;text-align:right;color:var(--accent-danger)">${Utils.formatCurrency(totalDesp)}</td>
                         <td style="padding:9px 12px;text-align:right;font-weight:700;${s.saldo >= 0 ? 'color:var(--accent-success)' : 'color:var(--accent-danger)'}">${Utils.formatCurrency(s.saldo)}</td>

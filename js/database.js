@@ -450,8 +450,8 @@ class FrotaDatabase {
         const payload = {
             truckId: closingData.truckId,
             placa: closingData.placa || '',
-            mes: closingData.mes,
-            ano: closingData.ano,
+            dataInicio: closingData.dataInicio,
+            dataFim: closingData.dataFim,
             totalAbastecimento: closingData.totalAbastecimento || 0,
             totalFretes: closingData.totalFretes || 0,
             totalMultas: closingData.totalMultas || 0,
@@ -467,7 +467,7 @@ class FrotaDatabase {
             geradoEm: new Date().toISOString()
         };
 
-        const existing = await this.getExistingTruckClosing(closingData.truckId, closingData.mes, closingData.ano);
+        const existing = await this.getExistingTruckClosing(closingData.truckId, closingData.dataInicio, closingData.dataFim);
         if (existing) {
             payload.id = existing.id;
             await this.update('truckClosings', payload);
@@ -478,13 +478,13 @@ class FrotaDatabase {
         }
     }
 
-    async getExistingTruckClosing(truckId, mes, ano) {
+    async getExistingTruckClosing(truckId, dataInicio, dataFim) {
         const { data, error } = await supabase
             .from('truck_closings')
             .select('*')
             .eq('truckId', truckId)
-            .eq('mes', mes)
-            .eq('ano', ano)
+            .eq('dataInicio', dataInicio)
+            .eq('dataFim', dataFim)
             .maybeSingle();
         if (error) return null;
         return data;
@@ -495,28 +495,44 @@ class FrotaDatabase {
             .from('truck_closings')
             .select('*')
             .eq('truckId', truckId)
-            .order('ano', { ascending: false })
-            .order('mes', { ascending: false });
+            .order('dataInicio', { ascending: false });
         if (error) return [];
         return data || [];
     }
 
-    // Core Business Logic: Monthly Closing
-    async generateMonthlyClosing(truckId, mes, ano) {
-        const fuelings = await this.getDataByTruckAndMonth('fuelings', truckId, mes, ano);
-        const freights = await this.getDataByTruckAndMonth('freights', truckId, mes, ano);
-        const fines = await this.getDataByTruckAndMonth('fines', truckId, mes, ano);
-        const expenses = await this.getDataByTruckAndMonth('truckExpenses', truckId, mes, ano);
+    async getDriverClosingForTruckByDateRange(truckId, dataInicio, dataFim) {
+        // Find a saved driver closing for a driver linked to this truck, overlapping the period
+        const { data, error } = await supabase
+            .from('driver_closings')
+            .select('*')
+            .eq('truckId', truckId)
+            .gte('dataInicio', dataInicio)
+            .lte('dataInicio', dataFim)
+            .order('created_at', { ascending: false })
+            .limit(1);
+        if (error || !data || !data.length) return null;
+        return data[0];
+    }
+
+    // Core Business Logic: Truck Closing by Date Range
+    async generateTruckClosingByDateRange(truckId, dataInicio, dataFim) {
+        const fuelings = await this.getDataByTruckAndDateRange('fuelings', truckId, dataInicio, dataFim);
+        const freights = await this.getDataByTruckAndDateRange('freights', truckId, dataInicio, dataFim);
+        const fines = await this.getDataByTruckAndDateRange('fines', truckId, dataInicio, dataFim);
+        const expenses = await this.getDataByTruckAndDateRange('truckExpenses', truckId, dataInicio, dataFim);
         const truck = await this.getById('trucks', truckId);
 
         // Fixed expenses (recurring monthly)
         const fixedExpenses = await this.getTruckFixedExpenses(truckId);
         const totalDespesasFixas = fixedExpenses.reduce((s, f) => s + (f.valor || 0), 0);
 
-        const prevDate = new Date(ano, mes - 2, 1);
-        const prevMes = prevDate.getMonth() + 1; // JS month 0-11
-        const prevAno = prevDate.getFullYear();
-        const prevFuelings = await this.getDataByTruckAndMonth('fuelings', truckId, prevMes, prevAno);
+        // For media calculation, include fuelings from the month before dataInicio
+        const startDate = new Date(dataInicio + 'T00:00:00');
+        const prevMonthStart = new Date(startDate.getFullYear(), startDate.getMonth() - 1, 1);
+        const prevMonthEnd = new Date(startDate.getFullYear(), startDate.getMonth(), 0);
+        const prevDataInicio = prevMonthStart.toISOString().split('T')[0];
+        const prevDataFim = prevMonthEnd.toISOString().split('T')[0];
+        const prevFuelings = await this.getDataByTruckAndDateRange('fuelings', truckId, prevDataInicio, prevDataFim);
         const fuelingsForMedia = [...prevFuelings.map(f => ({ ...f, _prevMonth: true })), ...fuelings];
 
         const totalAbastecimento = fuelings.reduce((s, f) => s + (f.valorTotal || 0), 0);
@@ -527,7 +543,6 @@ class FrotaDatabase {
         const totalLitros = fuelings.filter(f => f.tipoComb !== 'Arla').reduce((s, f) => s + (f.litros || 0), 0);
         const totalKmFretes = freights.reduce((s, f) => s + (f.km || 0), 0);
 
-        // Media calculation: sort fuelings with KM, use (last KM - first KM) / (liters excluding first fueling)
         const allFuelMedia = fuelingsForMedia.filter(f => f.km > 0 && f.tipoComb !== 'Arla').sort((a, b) => (a.data || '').localeCompare(b.data || '') || (a.km - b.km));
         let totalKm = 0, litrosMedia = 0;
         if (allFuelMedia.length >= 2) {
@@ -536,12 +551,12 @@ class FrotaDatabase {
         }
         const mediaConsumo = totalKm > 0 && litrosMedia > 0 ? parseFloat((totalKm / litrosMedia).toFixed(2)) : 0;
 
-        // Look for saved driver closing for this truck in this month
-        const driverClosingInfo = await this.getDriverClosingForTruck(truckId, mes, ano);
+        // Look for saved driver closing for this truck overlapping the period
+        const driverClosingInfo = await this.getDriverClosingForTruckByDateRange(truckId, dataInicio, dataFim);
         const totalSalarioMotorista = driverClosingInfo ? (driverClosingInfo.totalSemVales || 0) : 0;
 
-        const closing = {
-            truckId, placa: truck?.placa || '', mes, ano,
+        return {
+            truckId, placa: truck?.placa || '', dataInicio, dataFim,
             totalAbastecimento, totalFretes, totalMultas, totalDespesas, totalDespesasFixas,
             fixedExpenses,
             totalSalarioMotorista, driverClosingInfo,
@@ -549,12 +564,17 @@ class FrotaDatabase {
             mediaConsumo: totalKm > 0 && totalLitros > 0 ? parseFloat((totalKm / totalLitros).toFixed(2)) : 0,
             saldo: totalFretes - totalAbastecimento - totalMultas - totalDespesas - totalDespesasFixas - totalSalarioMotorista,
             qtdAbastecimentos: fuelings.length, qtdFretes: freights.length, qtdMultas: fines.length, qtdDespesas: expenses.length,
-            fuelings: fuelings,
-            fuelingsForMedia: fuelingsForMedia,
+            fuelings, fuelingsForMedia,
             geradoEm: new Date().toISOString()
         };
+    }
 
-        return closing;
+    // Legacy wrapper: generates by month/year for backward compatibility
+    async generateMonthlyClosing(truckId, mes, ano) {
+        const dataInicio = `${ano}-${String(mes).padStart(2, '0')}-01`;
+        const lastDay = new Date(ano, mes, 0).getDate();
+        const dataFim = `${ano}-${String(mes).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+        return this.generateTruckClosingByDateRange(truckId, dataInicio, dataFim);
     }
 
     async generateDriverClosing(userId, mes, ano, diasTrabalhados) {
