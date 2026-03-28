@@ -177,9 +177,17 @@ Pages.users = {
 // ===== DRIVER CLOSING PAGE =====
 Pages.driverClosing = {
     userId: null,
+    _salarioIntegral: true,
+    _diasTrabalhados: null,
+    _diasNoMes: null,
+    _salarioFixoBase: 0,
 
     async render(userId) {
         this.userId = userId;
+        this._salarioIntegral = true;
+        this._diasTrabalhados = null;
+        this._diasNoMes = null;
+        this._salarioFixoBase = 0;
         const users = await db.getAll('users');
         const drivers = users.filter(u => u.role === 'motorista');
         const trucks = await db.getAll('trucks');
@@ -199,7 +207,32 @@ Pages.driverClosing = {
                     </select></div>
                     <div class="form-group"><label class="form-label">Data Início</label><input type="date" class="form-control" id="dc-data-inicio" value="${primeiroDia}" onchange="Pages.driverClosing.onFilterChange()"></div>
                     <div class="form-group"><label class="form-label">Data Fim</label><input type="date" class="form-control" id="dc-data-fim" value="${ultimoDia}" onchange="Pages.driverClosing.onFilterChange()"></div>
-                    <div class="form-group"><label class="form-label">Dias Trabalhados</label><input type="number" min="1" max="31" class="form-control" id="dc-dias" value="${new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate()}" style="width:100px" title="Dias trabalhados no período (para comissão fixa proporcional)"></div>
+                    <div class="form-group">
+                        <label class="form-label">Salário Fixo</label>
+                        <button id="dc-salario-integral-btn" class="btn dc-toggle-integral active" onclick="Pages.driverClosing.toggleSalarioIntegral()">✅ Salário Integral</button>
+                    </div>
+                </div>
+
+                <div id="dc-proporcional-panel" class="dc-proporcional-panel" style="display:none">
+                    <span class="dc-proporcional-title">📅 Cálculo Proporcional de Salário</span>
+                    <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap">
+                        <div class="form-group" style="margin:0">
+                            <label class="form-label">Total de dias do mês</label>
+                            <input type="number" min="1" max="31" class="form-control" id="dc-dias-mes" value="30" style="width:90px" oninput="Pages.driverClosing.updatePreviewProporcional()">
+                        </div>
+                        <div class="form-group" style="margin:0">
+                            <label class="form-label">Dias trabalhados</label>
+                            <input type="number" min="1" max="31" class="form-control" id="dc-dias-trabalhados" value="30" style="width:90px" oninput="Pages.driverClosing.updatePreviewProporcional()">
+                        </div>
+                        <div class="form-group" style="margin:0;flex:1;min-width:180px">
+                            <label class="form-label">Salário proporcional</label>
+                            <div id="dc-proporcional-preview" class="dc-proporcional-preview">—</div>
+                        </div>
+                        <div style="display:flex;gap:8px;padding-bottom:1px">
+                            <button class="btn btn-primary btn-sm" onclick="Pages.driverClosing.confirmarProporcional()">Confirmar</button>
+                            <button class="btn btn-secondary btn-sm" onclick="Pages.driverClosing.cancelarProporcional()">Cancelar</button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Management Section (Always visible if driver selected) -->
@@ -261,17 +294,23 @@ Pages.driverClosing = {
         const dataInicio = document.getElementById('dc-data-inicio').value;
         const dataFim = document.getElementById('dc-data-fim').value;
 
-        // Update dias trabalhados max when date range changes
+        // Calculate period length and update proportional panel if open
         const startD = new Date(dataInicio + 'T00:00:00');
         const endD = new Date(dataFim + 'T00:00:00');
         const diasIntervalo = Math.round((endD - startD) / (1000 * 60 * 60 * 24)) + 1;
-        const diasInput = document.getElementById('dc-dias');
-        if (diasInput) {
-            diasInput.max = diasIntervalo;
-            if (parseInt(diasInput.value) > diasIntervalo || !diasInput._userEdited) {
-                diasInput.value = diasIntervalo;
-            }
+
+        if (!this._salarioIntegral) {
+            const diasMesInput = document.getElementById('dc-dias-mes');
+            const diasTrabInput = document.getElementById('dc-dias-trabalhados');
+            if (diasMesInput) { diasMesInput.value = diasIntervalo; diasMesInput.max = diasIntervalo; }
+            if (diasTrabInput) { diasTrabInput.max = diasIntervalo; if (parseInt(diasTrabInput.value) > diasIntervalo) diasTrabInput.value = diasIntervalo; }
+            this.updatePreviewProporcional();
         }
+
+        // Fetch driver salary base for preview calculations
+        const userForPreview = await db.getById('users', this.userId);
+        const commConfigForPreview = await db.getCommissionConfig();
+        this._salarioFixoBase = userForPreview?.salarioFixo || commConfigForPreview.salarioFixo || 0;
 
         // Show management section
         document.getElementById('dc-management-section').style.display = 'block';
@@ -280,6 +319,87 @@ Pages.driverClosing = {
         document.getElementById('driver-closing-result').innerHTML = '';
 
         await this.loadManagementData(this.userId, dataInicio, dataFim);
+    },
+
+    toggleSalarioIntegral() {
+        const btn = document.getElementById('dc-salario-integral-btn');
+        const panel = document.getElementById('dc-proporcional-panel');
+        if (!btn || !panel) return;
+
+        if (!this._salarioIntegral) {
+            // Currently proportional → switch back to integral
+            this._salarioIntegral = true;
+            this._diasTrabalhados = null;
+            this._diasNoMes = null;
+            btn.className = 'btn dc-toggle-integral active';
+            btn.textContent = '✅ Salário Integral';
+            panel.style.display = 'none';
+        } else {
+            // Currently integral → open proportional panel
+            this._salarioIntegral = false;
+            btn.className = 'btn dc-toggle-integral';
+            btn.textContent = '📅 Proporcional';
+            panel.style.display = 'block';
+
+            const dataInicio = document.getElementById('dc-data-inicio')?.value;
+            const dataFim = document.getElementById('dc-data-fim')?.value;
+            if (dataInicio && dataFim) {
+                const startD = new Date(dataInicio + 'T00:00:00');
+                const endD = new Date(dataFim + 'T00:00:00');
+                const diasIntervalo = Math.round((endD - startD) / (1000 * 60 * 60 * 24)) + 1;
+                document.getElementById('dc-dias-mes').value = diasIntervalo;
+                document.getElementById('dc-dias-trabalhados').value = diasIntervalo;
+            }
+            this.updatePreviewProporcional();
+        }
+    },
+
+    updatePreviewProporcional() {
+        const diasMes = parseInt(document.getElementById('dc-dias-mes')?.value) || 0;
+        const diasTrab = parseInt(document.getElementById('dc-dias-trabalhados')?.value) || 0;
+        const preview = document.getElementById('dc-proporcional-preview');
+        if (!preview) return;
+
+        if (!diasMes || !diasTrab || diasMes <= 0) { preview.innerHTML = '—'; return; }
+
+        const base = this._salarioFixoBase || 0;
+        const proporcional = base * (diasTrab / diasMes);
+        preview.innerHTML = `<strong style="color:var(--accent-primary);font-size:1.05rem">${Utils.formatCurrency(proporcional)}</strong>&nbsp;<span class="text-muted">(${diasTrab}/${diasMes} × ${Utils.formatCurrency(base)})</span>`;
+    },
+
+    confirmarProporcional() {
+        const diasMes = parseInt(document.getElementById('dc-dias-mes')?.value) || 0;
+        const diasTrab = parseInt(document.getElementById('dc-dias-trabalhados')?.value) || 0;
+        if (!diasMes || !diasTrab || diasMes <= 0 || diasTrab <= 0) {
+            Utils.showToast('Informe os dias corretamente', 'warning'); return;
+        }
+        if (diasTrab > diasMes) {
+            Utils.showToast('Dias trabalhados não pode ser maior que o total do mês', 'warning'); return;
+        }
+
+        this._salarioIntegral = false;
+        this._diasTrabalhados = diasTrab;
+        this._diasNoMes = diasMes;
+
+        const btn = document.getElementById('dc-salario-integral-btn');
+        if (btn) {
+            btn.className = 'btn dc-toggle-integral proporcional';
+            btn.textContent = `📅 ${diasTrab}/${diasMes} dias`;
+        }
+        document.getElementById('dc-proporcional-panel').style.display = 'none';
+    },
+
+    cancelarProporcional() {
+        this._salarioIntegral = true;
+        this._diasTrabalhados = null;
+        this._diasNoMes = null;
+
+        const btn = document.getElementById('dc-salario-integral-btn');
+        if (btn) {
+            btn.className = 'btn dc-toggle-integral active';
+            btn.textContent = '✅ Salário Integral';
+        }
+        document.getElementById('dc-proporcional-panel').style.display = 'none';
     },
 
     async loadManagementData(userId, dataInicio, dataFim) {
@@ -324,16 +444,20 @@ Pages.driverClosing = {
         const dataInicio = document.getElementById('dc-data-inicio').value;
         const dataFim = document.getElementById('dc-data-fim').value;
 
-        // Mark that user has edited dias field
-        const diasInput = document.getElementById('dc-dias');
-        if (diasInput) diasInput._userEdited = true;
-
         const startD = new Date(dataInicio + 'T00:00:00');
         const endD = new Date(dataFim + 'T00:00:00');
         const diasIntervalo = Math.round((endD - startD) / (1000 * 60 * 60 * 24)) + 1;
-        const diasTrabalhados = diasInput?.value ? parseInt(diasInput.value) : diasIntervalo;
 
-        const closingData = await db.generateDriverClosingByDateRange(userId, dataInicio, dataFim, diasTrabalhados);
+        let diasTrabalhados, diasNoMesOverride;
+        if (this._salarioIntegral) {
+            diasTrabalhados = diasIntervalo;
+            diasNoMesOverride = null;
+        } else {
+            diasTrabalhados = this._diasTrabalhados || diasIntervalo;
+            diasNoMesOverride = this._diasNoMes || null;
+        }
+
+        const closingData = await db.generateDriverClosingByDateRange(userId, dataInicio, dataFim, diasTrabalhados, diasNoMesOverride);
         if (!closingData) { document.getElementById('driver-closing-result').innerHTML = '<div class="empty-state"><h3>Motorista não encontrado</h3></div>'; return; }
 
         this._lastClosing = closingData; // Store for PDF

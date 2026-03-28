@@ -429,7 +429,7 @@ class FrotaDatabase {
         return this.generateDriverClosingByDateRange(userId, dataInicio, dataFim, diasTrabalhados);
     }
 
-    async generateDriverClosingByDateRange(userId, dataInicio, dataFim, diasTrabalhados) {
+    async generateDriverClosingByDateRange(userId, dataInicio, dataFim, diasTrabalhados, diasNoMesOverride) {
         const user = await this.getById('users', userId);
         if (!user) return null;
 
@@ -440,7 +440,8 @@ class FrotaDatabase {
         // Calculate days in period and proportional salary
         const start = new Date(dataInicio + 'T00:00:00');
         const end = new Date(dataFim + 'T00:00:00');
-        const diasNoMes = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+        const diasNoPeriodo = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+        const diasNoMes = (diasNoMesOverride && diasNoMesOverride > 0) ? diasNoMesOverride : diasNoPeriodo;
         if (!diasTrabalhados || diasTrabalhados > diasNoMes) diasTrabalhados = diasNoMes;
 
         let freights = [], fuelings = [], fuelingsForMedia = [];

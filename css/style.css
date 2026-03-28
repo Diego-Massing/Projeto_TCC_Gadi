@@ -1480,3 +1480,60 @@ select.form-control {
         background: #f0f0f0;
     }
 }
+
+/* ===== DRIVER CLOSING: SALARY TOGGLE ===== */
+.dc-toggle-integral {
+    padding: 7px 14px;
+    border-radius: var(--radius-md);
+    font-size: 0.85rem;
+    font-weight: 600;
+    border: 2px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: border-color 0.18s, background 0.18s, color 0.18s;
+    white-space: nowrap;
+    line-height: 1.4;
+}
+.dc-toggle-integral:hover {
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+.dc-toggle-integral.active {
+    border-color: var(--accent-success);
+    background: var(--accent-success-bg);
+    color: var(--accent-success);
+}
+.dc-toggle-integral.proporcional {
+    border-color: var(--accent-primary);
+    background: rgba(99, 102, 241, 0.12);
+    color: var(--accent-primary);
+}
+
+/* ===== DRIVER CLOSING: PROPORTIONAL SALARY PANEL ===== */
+.dc-proporcional-panel {
+    margin: -4px 0 16px 0;
+    padding: 14px 18px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-active);
+    border-radius: var(--radius-md);
+}
+.dc-proporcional-title {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--accent-primary);
+    margin-bottom: 12px;
+}
+.dc-proporcional-preview {
+    padding: 7px 12px;
+    background: var(--bg-input);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    font-size: 0.9rem;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+}
