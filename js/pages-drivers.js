@@ -275,6 +275,16 @@ Pages.driverClosing = {
                     </div>
                 </div>
 
+                <!-- Saved Closings Section -->
+                <div id="dc-saved-section" style="display:none; margin-bottom:20px">
+                    <div class="card">
+                        <div class="card-header" style="background:var(--bg-secondary);padding:10px 15px">
+                            <h4 style="font-size:0.9rem;margin:0">📋 Fechamentos Salvos</h4>
+                        </div>
+                        <div id="dc-saved-closings" class="card-body" style="padding:0"></div>
+                    </div>
+                </div>
+
                 <div id="driver-closing-result"></div>
             </div>`;
 
@@ -312,13 +322,15 @@ Pages.driverClosing = {
         const commConfigForPreview = await db.getCommissionConfig();
         this._salarioFixoBase = userForPreview?.salarioFixo || commConfigForPreview.salarioFixo || 0;
 
-        // Show management section
+        // Show management section and saved closings
         document.getElementById('dc-management-section').style.display = 'block';
+        document.getElementById('dc-saved-section').style.display = 'block';
 
         // Hide previous closing result until generated again
         document.getElementById('driver-closing-result').innerHTML = '';
 
         await this.loadManagementData(this.userId, dataInicio, dataFim);
+        await this.renderSavedClosings(this.userId);
     },
 
     toggleSalarioIntegral() {
@@ -400,6 +412,67 @@ Pages.driverClosing = {
             btn.textContent = '✅ Salário Integral';
         }
         document.getElementById('dc-proporcional-panel').style.display = 'none';
+    },
+
+    async saveClosing() {
+        const c = this._lastClosing;
+        if (!c) { Utils.showToast('Gere o fechamento primeiro', 'warning'); return; }
+
+        const existing = await db.getExistingDriverClosing(c.userId, c.dataInicio, c.dataFim);
+        if (existing) {
+            const ok = confirm(`Já existe um fechamento salvo para ${c.userName} no período ${Utils.formatDate(c.dataInicio)} a ${Utils.formatDate(c.dataFim)}.\n\nDeseja substituir?`);
+            if (!ok) return;
+        }
+
+        try {
+            const result = await db.saveDriverClosing(c);
+            Utils.showToast(result.replaced ? 'Fechamento atualizado!' : 'Fechamento salvo!', 'success');
+            await this.renderSavedClosings(c.userId);
+        } catch(e) {
+            console.error('Erro ao salvar fechamento:', e);
+            Utils.showToast('Erro ao salvar: ' + e.message, 'error');
+        }
+    },
+
+    async renderSavedClosings(driverId) {
+        const container = document.getElementById('dc-saved-closings');
+        if (!container) return;
+
+        const saved = await db.getDriverClosingsByDriver(driverId);
+        if (!saved.length) {
+            container.innerHTML = '<div style="padding:14px;text-align:center;color:#aaa;font-size:0.85rem">Nenhum fechamento salvo para este motorista.</div>';
+            return;
+        }
+
+        container.innerHTML = `<table class="data-table" style="font-size:0.85rem">
+            <thead><tr>
+                <th>Período</th>
+                <th class="text-right">Total a Pagar</th>
+                <th class="text-right">Custo s/ Vales</th>
+                <th>Salvo em</th>
+                <th></th>
+            </tr></thead>
+            <tbody>
+                ${saved.map(s => `<tr>
+                    <td>${Utils.formatDate(s.dataInicio)} a ${Utils.formatDate(s.dataFim)}</td>
+                    <td class="text-right font-bold text-success">${Utils.formatCurrency(s.totalPagar)}</td>
+                    <td class="text-right font-bold">${Utils.formatCurrency(s.totalSemVales)}</td>
+                    <td style="color:var(--text-muted)">${new Date(s.created_at).toLocaleDateString('pt-BR')}</td>
+                    <td style="text-align:right"><button class="btn-icon" style="color:var(--accent-danger);font-size:12px" onclick="Pages.driverClosing.deleteSavedClosing(${s.id}, ${driverId})" title="Excluir">🗑️</button></td>
+                </tr>`).join('')}
+            </tbody>
+        </table>`;
+    },
+
+    async deleteSavedClosing(id, driverId) {
+        if (!confirm('Excluir este fechamento salvo?')) return;
+        try {
+            await db.delete('driverClosings', id);
+            await this.renderSavedClosings(driverId);
+            Utils.showToast('Fechamento excluído', 'info');
+        } catch(e) {
+            Utils.showToast('Erro ao excluir: ' + e.message, 'error');
+        }
     },
 
     async loadManagementData(userId, dataInicio, dataFim) {
@@ -508,7 +581,8 @@ Pages.driverClosing = {
                 <div class="card-header">
                     <h3>\ud83d\udccb ${closingData.userName} \u2014 ${Utils.formatDate(closingData.dataInicio)} a ${Utils.formatDate(closingData.dataFim)}</h3>
                     <div class="btn-group">
-                        <button class="btn btn-primary btn-sm" onclick="Pages.driverClosing.exportPDF()">\ud83d\udcc4 Exportar PDF</button>
+                        <button class="btn btn-primary btn-sm" onclick="Pages.driverClosing.exportPDF()">📄 Exportar PDF</button>
+                        <button class="btn btn-secondary btn-sm" onclick="Pages.driverClosing.saveClosing()">💾 Salvar Fechamento</button>
                     </div>
                 </div>
                 <div class="card-body">

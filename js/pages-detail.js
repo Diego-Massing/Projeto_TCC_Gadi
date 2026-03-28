@@ -253,6 +253,8 @@ Pages.truckDetail = {
         const allFuelings = closing.fuelingsForMedia || closing.fuelings || [];
         const sortedFuelings = allFuelings.filter(f => f.km > 0 && f.tipoComb !== 'Arla').sort((a, b) => (a.data || '').localeCompare(b.data || '') || (a.km - b.km));
 
+        const dci = closing.driverClosingInfo;
+
         document.getElementById('closing-result').innerHTML = `
             <div class="closing-summary animate-in">
                 <div class="closing-item"><div class="closing-label">Abastecimentos (${closing.qtdAbastecimentos})</div><div class="closing-value text-danger">${Utils.formatCurrency(closing.totalAbastecimento)}</div></div>
@@ -260,10 +262,14 @@ Pages.truckDetail = {
                 <div class="closing-item"><div class="closing-label">Multas (${closing.qtdMultas})</div><div class="closing-value text-warning">${Utils.formatCurrency(closing.totalMultas)}</div></div>
                 <div class="closing-item"><div class="closing-label">Despesas (${closing.qtdDespesas})</div><div class="closing-value text-danger">${Utils.formatCurrency(closing.totalDespesas)}</div></div>
                 ${closing.totalDespesasFixas > 0 ? `<div class="closing-item"><div class="closing-label">Desp. Fixas (${(closing.fixedExpenses || []).length})</div><div class="closing-value text-danger">${Utils.formatCurrency(closing.totalDespesasFixas)}</div></div>` : ''}
+                ${dci ? `<div class="closing-item" title="Fechamento de ${Utils.formatDate(dci.dataInicio)} a ${Utils.formatDate(dci.dataFim)}"><div class="closing-label">👤 Sal. ${dci.driverName.split(' ')[0]}</div><div class="closing-value text-danger">${Utils.formatCurrency(dci.totalSemVales)}</div></div>` : ''}
                 <div class="closing-item ${closing.saldo >= 0 ? 'positive' : 'negative'}"><div class="closing-label">Saldo</div><div class="closing-value">${Utils.formatCurrency(closing.saldo)}</div></div>
                 <div class="closing-item"><div class="closing-label">Litros</div><div class="closing-value" id="truck-closing-litros">${Utils.formatNumber(closing.totalLitros, 1)}</div></div>
-                <div class="closing-item"><div class="closing-label">M\u00e9dia km/L</div><div class="closing-value" id="truck-closing-media">${closing.mediaConsumo}</div></div>
+                <div class="closing-item"><div class="closing-label">Média km/L</div><div class="closing-value" id="truck-closing-media">${closing.mediaConsumo}</div></div>
             </div>
+            ${dci ? `<div style="margin-bottom:12px;padding:8px 12px;background:rgba(99,102,241,0.08);border-left:3px solid var(--accent-primary);border-radius:var(--radius-sm);font-size:0.82rem;color:var(--text-secondary)">
+                💼 Salário de <strong>${dci.driverName}</strong> incluído no saldo — ${Utils.formatDate(dci.dataInicio)} a ${Utils.formatDate(dci.dataFim)} — <strong>${Utils.formatCurrency(dci.totalSemVales)}</strong> (sem vales)
+            </div>` : ''}
 
             ${sortedFuelings.length >= 2 ? `
             <div class="card mt-3" style="border:2px solid var(--accent-success);background:rgba(34,197,94,0.03)">

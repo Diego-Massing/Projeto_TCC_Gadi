@@ -39,10 +39,11 @@ class FrotaDatabase {
                 storeName === 'driverExpenses' ? 'driver_expenses' :
                     storeName === 'driverBonuses' ? 'driver_bonuses' :
                         storeName === 'driverDiscounts' ? 'driver_discounts' :
-                            storeName === 'maintenancePlans' ? 'maintenance_plans' :
-                                storeName === 'tires' ? 'tires' :
-                                    storeName === 'tiresHistory' ? 'tires_history' :
-                                        storeName;
+                            storeName === 'driverClosings' ? 'driver_closings' :
+                                storeName === 'maintenancePlans' ? 'maintenance_plans' :
+                                    storeName === 'tires' ? 'tires' :
+                                        storeName === 'tiresHistory' ? 'tires_history' :
+                                            storeName;
 
         const { data: inserted, error } = await supabase
             .from(table)
@@ -64,10 +65,11 @@ class FrotaDatabase {
                 storeName === 'driverExpenses' ? 'driver_expenses' :
                     storeName === 'driverBonuses' ? 'driver_bonuses' :
                         storeName === 'driverDiscounts' ? 'driver_discounts' :
-                            storeName === 'maintenancePlans' ? 'maintenance_plans' :
-                                storeName === 'tires' ? 'tires' :
-                                    storeName === 'tiresHistory' ? 'tires_history' :
-                                        storeName;
+                            storeName === 'driverClosings' ? 'driver_closings' :
+                                storeName === 'maintenancePlans' ? 'maintenance_plans' :
+                                    storeName === 'tires' ? 'tires' :
+                                        storeName === 'tiresHistory' ? 'tires_history' :
+                                            storeName;
 
         const { data: updated, error } = await supabase
             .from(table)
@@ -91,10 +93,11 @@ class FrotaDatabase {
                 storeName === 'driverExpenses' ? 'driver_expenses' :
                     storeName === 'driverBonuses' ? 'driver_bonuses' :
                         storeName === 'driverDiscounts' ? 'driver_discounts' :
-                            storeName === 'maintenancePlans' ? 'maintenance_plans' :
-                                storeName === 'tires' ? 'tires' :
-                                    storeName === 'tiresHistory' ? 'tires_history' :
-                                        storeName;
+                            storeName === 'driverClosings' ? 'driver_closings' :
+                                storeName === 'maintenancePlans' ? 'maintenance_plans' :
+                                    storeName === 'tires' ? 'tires' :
+                                        storeName === 'tiresHistory' ? 'tires_history' :
+                                            storeName;
 
         const { error } = await supabase.from(table).delete().eq('id', id);
         if (error) { console.error(`Error deleting from ${storeName}:`, error); throw error; }
@@ -108,10 +111,11 @@ class FrotaDatabase {
                 storeName === 'driverExpenses' ? 'driver_expenses' :
                     storeName === 'driverBonuses' ? 'driver_bonuses' :
                         storeName === 'driverDiscounts' ? 'driver_discounts' :
-                            storeName === 'maintenancePlans' ? 'maintenance_plans' :
-                                storeName === 'tires' ? 'tires' :
-                                    storeName === 'tiresHistory' ? 'tires_history' :
-                                        storeName;
+                            storeName === 'driverClosings' ? 'driver_closings' :
+                                storeName === 'maintenancePlans' ? 'maintenance_plans' :
+                                    storeName === 'tires' ? 'tires' :
+                                        storeName === 'tiresHistory' ? 'tires_history' :
+                                            storeName;
 
         const { data, error } = await supabase.from(table).select().eq('id', id).single();
         if (error) return null; // Not found or error
@@ -131,10 +135,11 @@ class FrotaDatabase {
                 storeName === 'driverExpenses' ? 'driver_expenses' :
                     storeName === 'driverBonuses' ? 'driver_bonuses' :
                         storeName === 'driverDiscounts' ? 'driver_discounts' :
-                            storeName === 'maintenancePlans' ? 'maintenance_plans' :
-                                storeName === 'tires' ? 'tires' :
-                                    storeName === 'tiresHistory' ? 'tires_history' :
-                                        storeName;
+                            storeName === 'driverClosings' ? 'driver_closings' :
+                                storeName === 'maintenancePlans' ? 'maintenance_plans' :
+                                    storeName === 'tires' ? 'tires' :
+                                        storeName === 'tiresHistory' ? 'tires_history' :
+                                            storeName;
 
         const { data, error } = await supabase.from(table).select('*');
         if (error) { console.error(`Error getting all ${storeName}:`, error); return []; }
@@ -362,6 +367,78 @@ class FrotaDatabase {
         return await this.setSetting(key, items);
     }
 
+    // ===== DRIVER CLOSINGS: Save & Query =====
+
+    async saveDriverClosing(closingData) {
+        const totalSemVales = parseFloat(((closingData.totalPagar || 0) + (closingData.totalDiscounts || 0)).toFixed(2));
+        const payload = {
+            driverId: closingData.userId,
+            truckId: closingData.truckId || null,
+            driverName: closingData.userName,
+            dataInicio: closingData.dataInicio,
+            dataFim: closingData.dataFim,
+            salarioFixo: closingData.salarioFixo || 0,
+            salarioFixoBase: closingData.salarioFixoBase || 0,
+            diasTrabalhados: closingData.diasTrabalhados || 0,
+            diasNoMes: closingData.diasNoMes || 0,
+            totalComissaoKm: closingData.totalComissaoKm || 0,
+            totalComissaoFechado: closingData.totalComissaoFechado || 0,
+            premioMedia: closingData.premioMedia || 0,
+            totalExpenses: closingData.totalExpenses || 0,
+            totalBonuses: closingData.totalBonuses || 0,
+            totalDiscounts: closingData.totalDiscounts || 0,
+            totalPagar: closingData.totalPagar || 0,
+            totalSemVales,
+            geradoEm: new Date().toISOString()
+        };
+
+        const existing = await this.getExistingDriverClosing(closingData.userId, closingData.dataInicio, closingData.dataFim);
+        if (existing) {
+            payload.id = existing.id;
+            await this.update('driverClosings', payload);
+            return { ...payload, replaced: true };
+        } else {
+            const id = await this.add('driverClosings', payload);
+            return { ...payload, id, replaced: false };
+        }
+    }
+
+    async getExistingDriverClosing(driverId, dataInicio, dataFim) {
+        const { data, error } = await supabase
+            .from('driver_closings')
+            .select('*')
+            .eq('driverId', driverId)
+            .eq('dataInicio', dataInicio)
+            .eq('dataFim', dataFim)
+            .maybeSingle();
+        if (error) return null;
+        return data;
+    }
+
+    async getDriverClosingsByDriver(driverId) {
+        const { data, error } = await supabase
+            .from('driver_closings')
+            .select('*')
+            .eq('driverId', driverId)
+            .order('dataInicio', { ascending: false });
+        if (error) return [];
+        return data || [];
+    }
+
+    async getDriverClosingForTruck(truckId, mes, ano) {
+        const monthStr = `${ano}-${String(mes).padStart(2, '0')}`;
+        const { data, error } = await supabase
+            .from('driver_closings')
+            .select('*')
+            .eq('truckId', truckId)
+            .gte('dataInicio', `${monthStr}-01`)
+            .lte('dataInicio', `${monthStr}-31`)
+            .order('created_at', { ascending: false })
+            .limit(1);
+        if (error || !data || !data.length) return null;
+        return data[0];
+    }
+
     // Core Business Logic: Monthly Closing
     async generateMonthlyClosing(truckId, mes, ano) {
         const fuelings = await this.getDataByTruckAndMonth('fuelings', truckId, mes, ano);
@@ -397,13 +474,18 @@ class FrotaDatabase {
         }
         const mediaConsumo = totalKm > 0 && litrosMedia > 0 ? parseFloat((totalKm / litrosMedia).toFixed(2)) : 0;
 
+        // Look for saved driver closing for this truck in this month
+        const driverClosingInfo = await this.getDriverClosingForTruck(truckId, mes, ano);
+        const totalSalarioMotorista = driverClosingInfo ? (driverClosingInfo.totalSemVales || 0) : 0;
+
         const closing = {
             truckId, placa: truck?.placa || '', mes, ano,
             totalAbastecimento, totalFretes, totalMultas, totalDespesas, totalDespesasFixas,
             fixedExpenses,
+            totalSalarioMotorista, driverClosingInfo,
             totalLitros, totalKm, totalKmFretes,
             mediaConsumo: totalKm > 0 && totalLitros > 0 ? parseFloat((totalKm / totalLitros).toFixed(2)) : 0,
-            saldo: totalFretes - totalAbastecimento - totalMultas - totalDespesas - totalDespesasFixas,
+            saldo: totalFretes - totalAbastecimento - totalMultas - totalDespesas - totalDespesasFixas - totalSalarioMotorista,
             qtdAbastecimentos: fuelings.length, qtdFretes: freights.length, qtdMultas: fines.length, qtdDespesas: expenses.length,
             fuelings: fuelings,
             fuelingsForMedia: fuelingsForMedia,
