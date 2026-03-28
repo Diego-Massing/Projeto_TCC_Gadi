@@ -178,7 +178,18 @@ Pages.fuelings = {
 
     async remove(id) {
         if (!confirm('Excluir este abastecimento?')) return;
-        await db.delete('fuelings', id); Utils.showToast('Excluído', 'success'); App.refreshCurrentPage();
+        const fueling = await db.getById('fuelings', id);
+        await db.delete('fuelings', id);
+
+        // Recalculate truck kmAtual from remaining fuelings
+        if (fueling?.truckId) {
+            const remaining = await db.getFuelingsByTruck(fueling.truckId);
+            const lastKm = remaining.filter(f => f.km > 0).reduce((max, f) => f.km > max ? f.km : max, 0);
+            await db.update('trucks', { id: fueling.truckId, kmAtual: lastKm });
+        }
+
+        Utils.showToast('Excluído', 'success');
+        App.refreshCurrentPage();
     },
 
     async exportCSV() {
