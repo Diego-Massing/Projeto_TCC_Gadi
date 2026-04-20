@@ -254,8 +254,8 @@ const App = {
     // Check if current user can access a page
     canAccess(page) {
         const access = {
-            admin: ['dashboard', 'trucks', 'truck-detail', 'fuelings', 'truck-expenses', 'freights', 'fines', 'users', 'driver-closing', 'closing', 'import', 'settings', 'tires-analytics'],
-            visualizador: ['dashboard', 'trucks', 'truck-detail', 'fuelings', 'truck-expenses', 'freights', 'fines', 'users', 'driver-closing', 'closing', 'tires-analytics'],
+            admin: ['dashboard', 'trucks', 'truck-detail', 'fuelings', 'truck-expenses', 'freights', 'fines', 'users', 'driver-closing', 'closing', 'import', 'settings', 'tires-analytics', 'miro'],
+            visualizador: ['dashboard', 'trucks', 'truck-detail', 'fuelings', 'truck-expenses', 'freights', 'fines', 'users', 'driver-closing', 'closing', 'tires-analytics', 'miro'],
             motorista: ['fuelings', 'freights']
         };
         return (access[this.userRole] || access.admin).includes(page);
