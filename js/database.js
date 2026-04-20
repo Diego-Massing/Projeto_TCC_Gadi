@@ -44,7 +44,9 @@ class FrotaDatabase {
                                     storeName === 'maintenancePlans' ? 'maintenance_plans' :
                                         storeName === 'tires' ? 'tires' :
                                             storeName === 'tiresHistory' ? 'tires_history' :
-                                                storeName;
+                                                storeName === 'miroCobrancas' ? 'miro_cobrancas' :
+                                                    storeName === 'miroBoletos' ? 'miro_boletos' :
+                                                        storeName;
 
         const { data: inserted, error } = await supabase
             .from(table)
@@ -71,7 +73,9 @@ class FrotaDatabase {
                                     storeName === 'maintenancePlans' ? 'maintenance_plans' :
                                         storeName === 'tires' ? 'tires' :
                                             storeName === 'tiresHistory' ? 'tires_history' :
-                                                storeName;
+                                                storeName === 'miroCobrancas' ? 'miro_cobrancas' :
+                                                    storeName === 'miroBoletos' ? 'miro_boletos' :
+                                                        storeName;
 
         const { data: updated, error } = await supabase
             .from(table)
@@ -100,7 +104,9 @@ class FrotaDatabase {
                                     storeName === 'maintenancePlans' ? 'maintenance_plans' :
                                         storeName === 'tires' ? 'tires' :
                                             storeName === 'tiresHistory' ? 'tires_history' :
-                                                storeName;
+                                                storeName === 'miroCobrancas' ? 'miro_cobrancas' :
+                                                    storeName === 'miroBoletos' ? 'miro_boletos' :
+                                                        storeName;
 
         const { error } = await supabase.from(table).delete().eq('id', id);
         if (error) { console.error(`Error deleting from ${storeName}:`, error); throw error; }
@@ -119,7 +125,9 @@ class FrotaDatabase {
                                     storeName === 'maintenancePlans' ? 'maintenance_plans' :
                                         storeName === 'tires' ? 'tires' :
                                             storeName === 'tiresHistory' ? 'tires_history' :
-                                                storeName;
+                                                storeName === 'miroCobrancas' ? 'miro_cobrancas' :
+                                                    storeName === 'miroBoletos' ? 'miro_boletos' :
+                                                        storeName;
 
         const { data, error } = await supabase.from(table).select().eq('id', id).single();
         if (error) return null; // Not found or error
@@ -144,7 +152,9 @@ class FrotaDatabase {
                                     storeName === 'maintenancePlans' ? 'maintenance_plans' :
                                         storeName === 'tires' ? 'tires' :
                                             storeName === 'tiresHistory' ? 'tires_history' :
-                                                storeName;
+                                                storeName === 'miroCobrancas' ? 'miro_cobrancas' :
+                                                    storeName === 'miroBoletos' ? 'miro_boletos' :
+                                                        storeName;
 
         const { data, error } = await supabase.from(table).select('*');
         if (error) { console.error(`Error getting all ${storeName}:`, error); return []; }

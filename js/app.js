@@ -302,6 +302,7 @@ const App = {
             case 'fuelings': await Pages.fuelings.render(); break;
             case 'truck-expenses': await Pages.truckExpenses.render(); break;
             case 'freights': await Pages.freights.render(); break;
+            case 'miro': await Pages.miro.render(); break;
             case 'fines': await Pages.fines.render(); break;
             case 'users': await Pages.users.render(); break;
             case 'driver-closing': await Pages.driverClosing.render(param); break;

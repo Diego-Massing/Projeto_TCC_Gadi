@@ -275,7 +275,7 @@ Pages.freights = {
             const mod = f.modalidade || 'kmSistema';
             return `<tr>
                 <td><input type="checkbox" class="freight-checkbox" value="${f.id}" onchange="Pages.freights.updateBulkBar()"></td>
-                <td class="font-mono font-bold">${t?.placa || '—'}</td><td>${Utils.formatDate(f.data)}</td><td>${f.origem || '—'}</td><td>${f.destino || '—'}</td>
+                <td class="font-mono font-bold">${t?.placa || '—'}${f.isMiro ? ' <span style="font-size:0.58rem;background:var(--accent-info);color:#fff;padding:1px 4px;border-radius:3px;vertical-align:middle">MIRO</span>' : ''}</td><td>${Utils.formatDate(f.data)}</td><td>${f.origem || '—'}</td><td>${f.destino || '—'}</td>
                 <td>${Utils.formatNumber(f.km)}</td><td><span class="badge ${f.tipo === 'carregado' ? 'badge-success' : 'badge-warning'}">${f.tipo || '—'}</span></td>
                 <td><span class="badge ${modalColors[mod] || 'badge-info'}" style="font-size:0.68rem">${modalLabels[mod] || mod}</span></td>
                 <td>${mod === 'fechado' ? `<span class="text-muted" style="font-size:0.75rem">${Utils.formatCurrency(f.taxaKmEfetiva || f.taxaKm)}</span>` : Utils.formatCurrency(f.taxaKm)}</td>
@@ -373,6 +373,13 @@ Pages.freights = {
                 <div class="form-group"><label class="form-label">Caminhão *</label><select class="form-control" id="f-truckId" onchange="Pages.freights.onTruckChange()" ${App.userRole === 'motorista' ? 'disabled' : ''}><option value="">Selecione</option>${trucks.map(t => `<option value="${t.id}" ${(item?.truckId === t.id || presetTruckId === t.id || (App.userRole === 'motorista' && App.userTruckId === t.id)) ? 'selected' : ''}>${t.placa}${t.kmCarregado != null ? ' 💰' : ''}</option>`).join('')}</select></div>
                 <div class="form-group"><label class="form-label">Data *</label><input type="date" class="form-control" id="f-data" value="${item?.data || new Date().toISOString().split('T')[0]}"></div>
             </div>
+            <div style="margin-bottom:10px">
+                <label id="f-miro-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 12px;background:var(--bg-primary);border-radius:var(--radius-sm);border:1px solid ${item?.isMiro ? 'var(--accent-warning)' : 'var(--border-color)'}">
+                    <input type="checkbox" id="f-isMiro" ${item?.isMiro ? 'checked' : ''} onchange="Pages.freights.onIsMiroChange()">
+                    <span style="font-weight:600">🔷 Frete MIRO Transportes</span>
+                    <span style="font-size:0.75rem;color:var(--text-secondary)">vincula ao controle de cobranças e descontos</span>
+                </label>
+            </div>
             <div class="form-row">
                 <div class="form-group"><label class="form-label">Cidade Origem *</label><input type="text" class="form-control" id="f-origem" value="${item?.origem || ''}" placeholder="Ex: São Paulo"></div>
                 <div class="form-group"><label class="form-label">Cidade Destino *</label><input type="text" class="form-control" id="f-destino" value="${item?.destino || ''}" placeholder="Ex: Curitiba"></div>
@@ -419,7 +426,7 @@ Pages.freights = {
                 <div class="form-group"><label class="form-label">Nota Fiscal</label><input type="text" class="form-control" id="f-notaFiscal" value="${item?.notaFiscal || ''}"></div>
             </div>
             <div class="form-group"><label class="form-label">Observações</label><input type="text" class="form-control" id="f-obs" value="${item?.obs || ''}"></div>
-            <div style="margin-top:8px;padding:10px;background:var(--bg-primary);border-radius:var(--radius-md);border:1px dashed var(--border-color)">
+            <div id="f-desconto-section" style="margin-top:8px;padding:10px;background:var(--bg-primary);border-radius:var(--radius-md);border:1px dashed var(--border-color);display:${(item?.isMiro || (item?.desconto > 0)) ? 'block' : 'none'}">
                 <label class="form-label" style="color:var(--accent-warning)">✂️ Desconto sobre o Frete</label>
                 <div class="form-row" style="margin-bottom:0">
                     <div class="form-group" style="flex:0 0 150px">
@@ -635,6 +642,7 @@ Pages.freights = {
             valorFrete,
             desconto,
             descontoObs: desconto > 0 ? (document.getElementById('f-descontoObs')?.value.trim() || '') : '',
+            isMiro: document.getElementById('f-isMiro')?.checked || false,
             comissaoFechado: mod === 'fechado' ? (parseFloat(document.getElementById('f-comissaoFechado').value) || 0) : 0,
             cliente: document.getElementById('f-cliente').value.trim(),
             notaFiscal: document.getElementById('f-notaFiscal').value.trim(),
@@ -651,6 +659,7 @@ Pages.freights = {
                 data.adiantamentoRecebido = existing.adiantamentoRecebido || false;
                 data.saldoRecebido = existing.saldoRecebido || false;
                 data.recebido = existing.recebido || false;
+                data.miroCobrancaId = existing.miroCobrancaId || null;
             }
         }
         try {
@@ -709,6 +718,14 @@ Pages.freights = {
         const salEl = document.getElementById('f-saldo');
         if (adEl) adEl.value = adiantamento.toFixed(2);
         if (salEl) salEl.value = saldo.toFixed(2);
+    },
+
+    onIsMiroChange() {
+        const isMiro = document.getElementById('f-isMiro')?.checked;
+        const section = document.getElementById('f-desconto-section');
+        const label = document.getElementById('f-miro-label');
+        if (section) section.style.display = isMiro ? 'block' : 'none';
+        if (label) label.style.borderColor = isMiro ? 'var(--accent-warning)' : 'var(--border-color)';
     },
 
     calcDesconto() {
@@ -976,5 +993,262 @@ Pages.truckExpenses = {
         link.href = URL.createObjectURL(blob);
         link.download = 'despesas_frota.csv';
         link.click();
+    }
+};
+
+// ===== COBRANÇAS MIRO PAGE =====
+Pages.miro = {
+    _sel: new Set(),
+
+    async render() {
+        const [freights, trucks, cobracas, boletos] = await Promise.all([
+            db.getAll('freights'),
+            db.getAll('trucks'),
+            db.getAll('miroCobrancas'),
+            db.getAll('miroBoletos')
+        ]);
+
+        const miroFreights = freights.filter(f => f.isMiro);
+        const pendentes = miroFreights.filter(f => !f.miroCobrancaId && (f.desconto || 0) > 0);
+        this._sel = new Set();
+
+        document.getElementById('page-content').innerHTML = `
+            <div class="page-header"><div class="page-header-row">
+                <div><h1 class="page-title">🔷 Cobranças MIRO</h1><p class="page-subtitle">Controle de descontos e boletos — Transportes MIRO</p></div>
+            </div></div>
+            <div class="page-body">
+                <div style="margin-bottom:28px">
+                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+                        <h3 style="margin:0;font-size:1rem;color:var(--accent-warning)">✂️ Descontos Pendentes</h3>
+                        <span class="badge badge-warning" style="font-size:0.75rem">${pendentes.length} fretes</span>
+                    </div>
+                    <div id="miro-pendentes">${this.renderPendentes(pendentes, trucks)}</div>
+                    <div id="miro-sel-bar" style="display:none;position:sticky;bottom:12px;background:var(--bg-secondary);border:1px solid var(--accent-warning);border-radius:var(--radius-md);padding:12px 16px;margin-top:8px;align-items:center;gap:16px;flex-wrap:wrap">
+                        <span id="miro-sel-info" style="flex:1;font-weight:600"></span>
+                        <button class="btn btn-primary btn-sm" onclick="Pages.miro.showGerarForm()">📑 Gerar Cobrança</button>
+                    </div>
+                </div>
+                <div>
+                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+                        <h3 style="margin:0;font-size:1rem;color:var(--accent-info)">📑 Cobranças Geradas</h3>
+                        <span class="badge badge-info" style="font-size:0.75rem">${cobracas.length} cobranças</span>
+                    </div>
+                    <div id="miro-cobracas">${this.renderCobracas(cobracas, boletos, miroFreights, trucks)}</div>
+                </div>
+            </div>`;
+
+        this.updateSelBar();
+    },
+
+    renderPendentes(freights, trucks) {
+        if (freights.length === 0) return '<div class="empty-state"><div class="empty-icon">✅</div><h3>Nenhum desconto pendente</h3><p>Todos os fretes MIRO com desconto já foram incluídos em cobranças.</p></div>';
+        const total = freights.reduce((s, f) => s + (f.desconto || 0), 0);
+        return `<div class="table-container"><table class="data-table">
+            <thead><tr>
+                <th><input type="checkbox" id="miro-sel-all" onchange="Pages.miro.toggleAll(this.checked)"></th>
+                <th>Data</th><th>Placa</th><th>Origem → Destino</th>
+                <th>Valor Frete</th><th style="color:var(--accent-warning)">Desconto</th><th>Obs Desconto</th>
+            </tr></thead>
+            <tbody>${freights.map(f => {
+                const t = trucks.find(tt => tt.id === f.truckId);
+                return `<tr>
+                    <td><input type="checkbox" class="miro-cb" data-id="${f.id}" onchange="Pages.miro.toggleSel(${f.id})"></td>
+                    <td>${Utils.formatDate(f.data)}</td>
+                    <td class="font-mono font-bold">${t?.placa || '—'}</td>
+                    <td style="font-size:0.8rem">${f.origem || '—'} → ${f.destino || '—'}</td>
+                    <td>${Utils.formatCurrency(f.valorFrete)}</td>
+                    <td class="font-bold" style="color:var(--accent-warning)">${Utils.formatCurrency(f.desconto)}</td>
+                    <td style="font-size:0.75rem;color:var(--text-secondary)">${f.descontoObs || '—'}</td>
+                </tr>`;
+            }).join('')}</tbody>
+        </table></div>
+        <div class="table-footer"><span>${freights.length} fretes pendentes</span><span>Total descontos: <strong style="color:var(--accent-warning)">${Utils.formatCurrency(total)}</strong></span></div>`;
+    },
+
+    renderCobracas(cobracas, boletos, miroFreights, trucks) {
+        if (cobracas.length === 0) return '<div class="empty-state"><div class="empty-icon">📑</div><h3>Nenhuma cobrança gerada</h3><p>Selecione fretes pendentes e clique em "Gerar Cobrança".</p></div>';
+        cobracas.sort((a, b) => b.id - a.id);
+        return cobracas.map(c => {
+            const cBoletos = boletos.filter(b => b.cobrancaId === c.id).sort((a, b) => a.semana - b.semana);
+            const cFreights = miroFreights.filter(f => f.miroCobrancaId === c.id);
+            const totalPago = cBoletos.filter(b => b.pago).reduce((s, b) => s + (b.valor || 0), 0);
+            const allPago = cBoletos.length > 0 && cBoletos.every(b => b.pago);
+            return `<div style="background:var(--bg-secondary);border:1px solid ${allPago ? 'var(--accent-success)' : 'var(--border-color)'};border-radius:var(--radius-md);padding:16px;margin-bottom:12px">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+                    <div>
+                        <strong style="font-size:1rem">${c.referencia}</strong>
+                        ${allPago ? '<span class="badge badge-success" style="margin-left:8px;font-size:0.7rem">✅ Quitado</span>' : ''}
+                        <div style="font-size:0.75rem;color:var(--text-secondary);margin-top:2px">
+                            ${cFreights.length} fretes · Total descontos: <strong style="color:var(--accent-warning)">${Utils.formatCurrency(c.totalDesconto)}</strong>
+                            · Pago até agora: <strong style="color:var(--accent-success)">${Utils.formatCurrency(totalPago)}</strong>
+                        </div>
+                        ${c.obs ? `<div style="font-size:0.75rem;color:var(--text-secondary);margin-top:2px">${c.obs}</div>` : ''}
+                    </div>
+                    <button class="btn btn-sm" style="color:var(--accent-danger);background:transparent;border:1px solid var(--accent-danger);font-size:0.75rem" onclick="Pages.miro.removeCobranca(${c.id})">🗑️ Excluir</button>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px">
+                    ${cBoletos.map(b => `
+                        <div style="background:var(--bg-primary);border-radius:var(--radius-sm);padding:10px;border:1px solid ${b.pago ? 'var(--accent-success)' : 'var(--border-color)'}">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                                <span style="font-size:0.7rem;font-weight:700;color:var(--text-secondary)">SEMANA ${b.semana}</span>
+                                <button class="btn btn-sm" style="font-size:0.62rem;padding:2px 7px;background:${b.pago ? 'var(--accent-success)' : 'var(--bg-tertiary)'};color:${b.pago ? '#fff' : 'var(--text-secondary)'};border:none;border-radius:4px;cursor:pointer" onclick="Pages.miro.togglePago(${b.id})">${b.pago ? '✅ Pago' : '⬜ Pendente'}</button>
+                            </div>
+                            <div style="font-size:1rem;font-weight:700;color:var(--accent-info)">${Utils.formatCurrency(b.valor)}</div>
+                            ${b.numeroBoleto ? `<div style="font-size:0.7rem;color:var(--text-secondary)">Nº ${b.numeroBoleto}</div>` : ''}
+                            ${b.vencimento ? `<div style="font-size:0.7rem;color:var(--text-secondary)">Venc.: ${Utils.formatDate(b.vencimento)}</div>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+                <details style="margin-top:10px">
+                    <summary style="font-size:0.75rem;color:var(--text-secondary);cursor:pointer">Ver fretes incluídos (${cFreights.length})</summary>
+                    <div style="margin-top:8px">
+                        ${cFreights.map(f => {
+                            const t = trucks.find(tt => tt.id === f.truckId);
+                            return `<div style="font-size:0.75rem;padding:4px 0;border-bottom:1px solid var(--border-color);color:var(--text-secondary)">${Utils.formatDate(f.data)} · ${t?.placa || '—'} · ${f.origem || ''} → ${f.destino || ''} · <strong style="color:var(--accent-warning)">-${Utils.formatCurrency(f.desconto)}</strong></div>`;
+                        }).join('')}
+                    </div>
+                </details>
+            </div>`;
+        }).join('');
+    },
+
+    toggleSel(id) {
+        if (this._sel.has(id)) this._sel.delete(id);
+        else this._sel.add(id);
+        this.updateSelBar();
+    },
+
+    toggleAll(checked) {
+        document.querySelectorAll('.miro-cb').forEach(cb => {
+            const id = parseInt(cb.dataset.id);
+            if (checked) this._sel.add(id);
+            else this._sel.delete(id);
+            cb.checked = checked;
+        });
+        this.updateSelBar();
+    },
+
+    async updateSelBar() {
+        const bar = document.getElementById('miro-sel-bar');
+        if (!bar) return;
+        if (this._sel.size === 0) { bar.style.display = 'none'; return; }
+        const freights = await db.getAll('freights');
+        const sel = freights.filter(f => this._sel.has(f.id));
+        const total = sel.reduce((s, f) => s + (f.desconto || 0), 0);
+        bar.style.display = 'flex';
+        const info = document.getElementById('miro-sel-info');
+        if (info) info.textContent = `${this._sel.size} frete(s) selecionado(s) — Total descontos: ${Utils.formatCurrency(total)}`;
+    },
+
+    async showGerarForm() {
+        if (this._sel.size === 0) { Utils.showToast('Selecione ao menos um frete', 'warning'); return; }
+        const freights = await db.getAll('freights');
+        const sel = freights.filter(f => this._sel.has(f.id));
+        const totalDesc = sel.reduce((s, f) => s + (f.desconto || 0), 0);
+        const valorBoleto = parseFloat((totalDesc / 4).toFixed(2));
+
+        const hoje = new Date();
+        const proxSeg = new Date(hoje);
+        const diasParaSeg = (1 + 7 - hoje.getDay()) % 7 || 7;
+        proxSeg.setDate(hoje.getDate() + diasParaSeg);
+        const semanas = [0, 1, 2, 3].map(i => {
+            const d = new Date(proxSeg);
+            d.setDate(proxSeg.getDate() + i * 7);
+            return d.toISOString().split('T')[0];
+        });
+
+        const html = `
+            <div class="form-group">
+                <label class="form-label">Referência * (ex: Abril 2026)</label>
+                <input type="text" class="form-control" id="mc-ref" placeholder="Ex: Abril 2026">
+            </div>
+            <div style="background:var(--bg-primary);border-radius:var(--radius-md);padding:12px;margin-bottom:12px">
+                <div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:4px">${sel.length} frete(s) selecionado(s)</div>
+                <div>Total descontos: <strong style="color:var(--accent-warning)">${Utils.formatCurrency(totalDesc)}</strong></div>
+                <div style="font-size:0.8rem;color:var(--text-secondary)">Valor por boleto (÷4): <strong>${Utils.formatCurrency(valorBoleto)}</strong></div>
+            </div>
+            <div class="form-group"><label class="form-label">Observações</label><input type="text" class="form-control" id="mc-obs" placeholder="Opcional"></div>
+            <hr style="border-color:#333;margin:12px 0">
+            <label class="form-label" style="color:var(--accent-info)">📑 Boletos Semanais</label>
+            ${[1,2,3,4].map(s => `
+            <div style="background:var(--bg-primary);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px">
+                <strong style="font-size:0.8rem;color:var(--text-secondary)">SEMANA ${s}</strong>
+                <div class="form-row" style="margin-top:6px;margin-bottom:0">
+                    <div class="form-group" style="flex:0 0 130px">
+                        <label class="form-label">Valor (R$)</label>
+                        <input type="number" step="0.01" class="form-control" id="mc-val-${s}" value="${valorBoleto.toFixed(2)}">
+                    </div>
+                    <div class="form-group" style="flex:1">
+                        <label class="form-label">Nº Boleto</label>
+                        <input type="text" class="form-control" id="mc-num-${s}" placeholder="Opcional">
+                    </div>
+                    <div class="form-group" style="flex:0 0 145px">
+                        <label class="form-label">Vencimento</label>
+                        <input type="date" class="form-control" id="mc-venc-${s}" value="${semanas[s-1]}">
+                    </div>
+                </div>
+            </div>`).join('')}`;
+
+        App.openModal('Gerar Cobrança MIRO', html, [
+            { label: 'Cancelar', class: 'btn-secondary', onclick: 'App.closeModal()' },
+            { label: '📑 Gerar Cobrança', class: 'btn-primary', onclick: 'Pages.miro.gerarCobranca()' }
+        ]);
+    },
+
+    async gerarCobranca() {
+        const ref = document.getElementById('mc-ref').value.trim();
+        if (!ref) { Utils.showToast('Informe a referência', 'warning'); return; }
+        const freights = await db.getAll('freights');
+        const sel = freights.filter(f => this._sel.has(f.id));
+        const totalDesc = sel.reduce((s, f) => s + (f.desconto || 0), 0);
+        try {
+            const cobrancaId = await db.add('miroCobrancas', {
+                referencia: ref,
+                totalDesconto: totalDesc,
+                obs: document.getElementById('mc-obs').value.trim()
+            });
+            for (let s = 1; s <= 4; s++) {
+                await db.add('miroBoletos', {
+                    cobrancaId,
+                    semana: s,
+                    numeroBoleto: document.getElementById(`mc-num-${s}`)?.value.trim() || '',
+                    valor: parseFloat(document.getElementById(`mc-val-${s}`)?.value) || 0,
+                    vencimento: document.getElementById(`mc-venc-${s}`)?.value || null,
+                    pago: false
+                });
+            }
+            for (const f of sel) {
+                await db.update('freights', { ...f, miroCobrancaId: cobrancaId });
+            }
+            Utils.showToast('Cobrança gerada com sucesso!', 'success');
+            App.closeModal();
+            this._sel = new Set();
+            App.refreshCurrentPage();
+        } catch (e) {
+            Utils.showToast('Erro ao gerar cobrança', 'error');
+        }
+    },
+
+    async togglePago(boletoId) {
+        const boleto = await db.getById('miroBoletos', boletoId);
+        if (!boleto) return;
+        await db.update('miroBoletos', { ...boleto, pago: !boleto.pago });
+        App.refreshCurrentPage();
+    },
+
+    async removeCobranca(id) {
+        if (!confirm('Excluir esta cobrança? Os fretes voltarão para pendentes.')) return;
+        const freights = await db.getAll('freights');
+        const linked = freights.filter(f => f.miroCobrancaId === id);
+        for (const f of linked) {
+            await db.update('freights', { ...f, miroCobrancaId: null });
+        }
+        const boletos = await db.getAll('miroBoletos');
+        for (const b of boletos.filter(b => b.cobrancaId === id)) {
+            await db.delete('miroBoletos', b.id);
+        }
+        await db.delete('miroCobrancas', id);
+        Utils.showToast('Cobrança excluída', 'success');
+        App.refreshCurrentPage();
     }
 };
