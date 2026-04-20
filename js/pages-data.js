@@ -373,17 +373,16 @@ Pages.freights = {
                 <div class="form-group"><label class="form-label">Caminhão *</label><select class="form-control" id="f-truckId" onchange="Pages.freights.onTruckChange()" ${App.userRole === 'motorista' ? 'disabled' : ''}><option value="">Selecione</option>${trucks.map(t => `<option value="${t.id}" ${(item?.truckId === t.id || presetTruckId === t.id || (App.userRole === 'motorista' && App.userTruckId === t.id)) ? 'selected' : ''}>${t.placa}${t.kmCarregado != null ? ' 💰' : ''}</option>`).join('')}</select></div>
                 <div class="form-group"><label class="form-label">Data *</label><input type="date" class="form-control" id="f-data" value="${item?.data || new Date().toISOString().split('T')[0]}"></div>
             </div>
-            <div style="margin-bottom:10px">
-                <label id="f-miro-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 12px;background:var(--bg-primary);border-radius:var(--radius-sm);border:1px solid ${item?.isMiro ? 'var(--accent-warning)' : 'var(--border-color)'}">
-                    <input type="checkbox" id="f-isMiro" ${item?.isMiro ? 'checked' : ''} onchange="Pages.freights.onIsMiroChange()">
-                    <span style="font-weight:600">🔷 Frete MIRO Transportes</span>
-                    <span style="font-size:0.75rem;color:var(--text-secondary)">vincula ao controle de cobranças e descontos</span>
-                </label>
-            </div>
             <div class="form-row">
                 <div class="form-group"><label class="form-label">Cidade Origem *</label><input type="text" class="form-control" id="f-origem" value="${item?.origem || ''}" placeholder="Ex: São Paulo"></div>
                 <div class="form-group"><label class="form-label">Cidade Destino *</label><input type="text" class="form-control" id="f-destino" value="${item?.destino || ''}" placeholder="Ex: Curitiba"></div>
                 <button class="btn btn-secondary btn-sm" onclick="Pages.freights.calcDistance()" style="margin-top:20px;white-space:nowrap" title="Calcular KM via OSRM (gratuito)">📏 Calcular KM</button>
+            </div>
+            <div style="margin-bottom:8px">
+                <label id="f-miro-label" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:4px 10px;background:var(--bg-primary);border-radius:var(--radius-sm);border:1px solid ${item?.isMiro ? 'var(--accent-warning)' : 'var(--border-color)'}">
+                    <input type="checkbox" id="f-isMiro" ${item?.isMiro ? 'checked' : ''} onchange="Pages.freights.onIsMiroChange()">
+                    <span style="font-size:0.8rem">🔷 Frete MIRO</span>
+                </label>
             </div>
             <div class="form-row">
                 <div class="form-group"><label class="form-label">KM da Rota</label><input type="number" class="form-control" id="f-km" value="${item?.km || ''}" oninput="Pages.freights.calcFrete()"></div>
@@ -1189,10 +1188,11 @@ Pages.miro = {
                 </div>
             </div>`).join('')}`;
 
-        App.openModal('Gerar Cobrança MIRO', html, [
-            { label: 'Cancelar', class: 'btn-secondary', onclick: 'App.closeModal()' },
-            { label: '📑 Gerar Cobrança', class: 'btn-primary', onclick: 'Pages.miro.gerarCobranca()' }
-        ]);
+        const modal = document.getElementById('modal-overlay');
+        modal.querySelector('.modal-header h2').textContent = 'Gerar Cobrança MIRO';
+        modal.querySelector('.modal-body').innerHTML = html;
+        modal.querySelector('.modal-footer').innerHTML = `<button class="btn btn-secondary" onclick="App.closeModal()">Cancelar</button><button class="btn btn-primary" onclick="Pages.miro.gerarCobranca()">📑 Gerar Cobrança</button>`;
+        App.openModal();
     },
 
     async gerarCobranca() {
