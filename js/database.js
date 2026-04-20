@@ -536,7 +536,7 @@ class FrotaDatabase {
         const fuelingsForMedia = [...prevFuelings.map(f => ({ ...f, _prevMonth: true })), ...fuelings];
 
         const totalAbastecimento = fuelings.reduce((s, f) => s + (f.valorTotal || 0), 0);
-        const totalFretes = freights.reduce((s, f) => s + (f.valorFrete || 0), 0);
+        const totalFretes = freights.reduce((s, f) => s + ((f.valorFrete || 0) - (f.desconto || 0)), 0);
         const totalMultas = fines.reduce((s, f) => s + (f.valor || 0), 0);
         const totalDespesas = expenses.reduce((s, f) => s + (f.valor || 0), 0);
 

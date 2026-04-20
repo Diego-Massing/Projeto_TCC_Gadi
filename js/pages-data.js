@@ -259,7 +259,7 @@ Pages.freights = {
 
     renderTable(freights, trucks) {
         if (freights.length === 0) return '<div class="empty-state"><div class="empty-icon">📦</div><h3>Nenhum frete encontrado</h3></div>';
-        const total = freights.reduce((s, f) => s + (f.valorFrete || 0), 0);
+        const total = freights.reduce((s, f) => s + ((f.valorFrete || 0) - (f.desconto || 0)), 0);
         const totalKm = freights.reduce((s, f) => s + (f.km || 0), 0);
         const modalLabels = { kmPlaca: '🚛 Placa', kmSistema: '⚙️ Sistema', fechado: '🔒 Fechado' };
         const modalColors = { kmPlaca: 'badge-info', kmSistema: 'badge-warning', fechado: 'badge-success' };
@@ -279,7 +279,7 @@ Pages.freights = {
                 <td>${Utils.formatNumber(f.km)}</td><td><span class="badge ${f.tipo === 'carregado' ? 'badge-success' : 'badge-warning'}">${f.tipo || '—'}</span></td>
                 <td><span class="badge ${modalColors[mod] || 'badge-info'}" style="font-size:0.68rem">${modalLabels[mod] || mod}</span></td>
                 <td>${mod === 'fechado' ? `<span class="text-muted" style="font-size:0.75rem">${Utils.formatCurrency(f.taxaKmEfetiva || f.taxaKm)}</span>` : Utils.formatCurrency(f.taxaKm)}</td>
-                <td class="font-bold text-success">${Utils.formatCurrency(f.valorFrete)}</td>
+                <td class="font-bold text-success">${f.desconto > 0 ? `<span title="Bruto: ${Utils.formatCurrency(f.valorFrete)}">${Utils.formatCurrency((f.valorFrete || 0) - (f.desconto || 0))}</span><br><span style="font-size:0.65rem;color:var(--accent-warning);font-weight:400">-${Utils.formatCurrency(f.desconto)}${f.descontoObs ? ' ' + f.descontoObs : ''}</span>` : Utils.formatCurrency(f.valorFrete)}</td>
                 <td>${this.getPaymentBadges(f)}</td>
                 <td>${f.cliente || '—'}</td>
                 <td>${App.userRole !== 'visualizador' ? `<button class="btn btn-icon btn-secondary btn-sm" onclick="Pages.freights.showForm(${f.id})">✏️</button> <button class="btn btn-icon btn-sm" style="color:var(--accent-danger)" onclick="Pages.freights.remove(${f.id})">🗑️</button>` : ''}</td>
@@ -419,6 +419,23 @@ Pages.freights = {
                 <div class="form-group"><label class="form-label">Nota Fiscal</label><input type="text" class="form-control" id="f-notaFiscal" value="${item?.notaFiscal || ''}"></div>
             </div>
             <div class="form-group"><label class="form-label">Observações</label><input type="text" class="form-control" id="f-obs" value="${item?.obs || ''}"></div>
+            <div style="margin-top:8px;padding:10px;background:var(--bg-primary);border-radius:var(--radius-md);border:1px dashed var(--border-color)">
+                <label class="form-label" style="color:var(--accent-warning)">✂️ Desconto sobre o Frete</label>
+                <div class="form-row" style="margin-bottom:0">
+                    <div class="form-group" style="flex:0 0 150px">
+                        <label class="form-label">Valor Desconto (R$)</label>
+                        <input type="number" step="0.01" class="form-control" id="f-desconto" value="${item?.desconto || ''}" oninput="Pages.freights.calcDesconto()" placeholder="0,00" min="0">
+                    </div>
+                    <div class="form-group" style="flex:1" id="f-desconto-obs-group" style="display:${(item?.desconto > 0) ? 'flex' : 'none'}">
+                        <label class="form-label">Motivo do Desconto</label>
+                        <input type="text" class="form-control" id="f-descontoObs" value="${item?.descontoObs || ''}" placeholder="Ex: Descarga, Pedágio...">
+                    </div>
+                </div>
+                <div id="valor-final-row" style="display:${(item?.desconto > 0) ? 'block' : 'none'};margin-top:4px">
+                    <span class="text-muted" style="font-size:0.8rem">💡 Valor Final (após desconto): </span><strong id="valor-final-value" class="text-success">${(item?.desconto > 0) ? Utils.formatCurrency((item?.valorFrete || 0) - (item?.desconto || 0)) : '—'}</strong>
+                    <span class="text-muted" style="font-size:0.75rem;margin-left:8px">(adiantamento e saldo não são afetados)</span>
+                </div>
+            </div>
             <div id="maps-result" style="margin-top:8px"></div>
             <hr style="border-color:#333;margin:16px 0">
             <div style="padding:12px;background:var(--bg-primary);border-radius:var(--radius-md)">
@@ -448,6 +465,7 @@ Pages.freights = {
             this.onModalidadeChange();
             this.calcFrete();
             this.onPagamentoChange();
+            this.calcDesconto();
         }, 100);
     },
 
@@ -528,6 +546,7 @@ Pages.freights = {
             }
         }
         this.calcPagamento();
+        this.calcDesconto();
     },
 
     onTipoComissaoChange() {
@@ -603,6 +622,7 @@ Pages.freights = {
             saldo = parseFloat((valorFrete - adiantamento).toFixed(2));
         }
 
+        const desconto = parseFloat(document.getElementById('f-desconto')?.value) || 0;
         const data = {
             truckId,
             data: document.getElementById('f-data').value,
@@ -613,6 +633,8 @@ Pages.freights = {
             taxaKm: mod === 'fechado' ? 0 : taxaKm,
             taxaKmEfetiva,
             valorFrete,
+            desconto,
+            descontoObs: desconto > 0 ? (document.getElementById('f-descontoObs')?.value.trim() || '') : '',
             comissaoFechado: mod === 'fechado' ? (parseFloat(document.getElementById('f-comissaoFechado').value) || 0) : 0,
             cliente: document.getElementById('f-cliente').value.trim(),
             notaFiscal: document.getElementById('f-notaFiscal').value.trim(),
@@ -687,6 +709,18 @@ Pages.freights = {
         const salEl = document.getElementById('f-saldo');
         if (adEl) adEl.value = adiantamento.toFixed(2);
         if (salEl) salEl.value = saldo.toFixed(2);
+    },
+
+    calcDesconto() {
+        const desconto = parseFloat(document.getElementById('f-desconto')?.value) || 0;
+        const valorFrete = parseFloat(document.getElementById('f-valorFrete')?.value) || 0;
+        const obsGroup = document.getElementById('f-desconto-obs-group');
+        const finalRow = document.getElementById('valor-final-row');
+        const finalEl = document.getElementById('valor-final-value');
+        const visible = desconto > 0;
+        if (obsGroup) obsGroup.style.display = visible ? 'flex' : 'none';
+        if (finalRow) finalRow.style.display = visible ? 'block' : 'none';
+        if (finalEl) finalEl.textContent = visible ? Utils.formatCurrency(valorFrete - desconto) : '—';
     },
 
     async toggleRecebido(id, campo) {
