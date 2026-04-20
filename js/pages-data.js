@@ -615,7 +615,8 @@ Pages.freights = {
         const km = parseFloat(document.getElementById('f-km').value) || 0;
         const valorFrete = parseFloat(document.getElementById('f-valorFrete').value) || 0;
         const taxaKm = parseFloat(document.getElementById('f-taxaKm').value) || 0;
-        const taxaKmEfetiva = mod === 'fechado' && km > 0 ? parseFloat((valorFrete / km).toFixed(4)) : taxaKm;
+        const desconto = parseFloat(document.getElementById('f-desconto')?.value) || 0;
+        const taxaKmEfetiva = mod === 'fechado' && km > 0 ? parseFloat(((valorFrete - desconto) / km).toFixed(4)) : taxaKm;
 
         const pagamentoTipo = document.getElementById('f-pagamentoTipo')?.value || 'integral';
         let adiantamento = 0, saldo = 0, pctAdiantamento = null;
@@ -628,7 +629,6 @@ Pages.freights = {
             saldo = parseFloat((valorFrete - adiantamento).toFixed(2));
         }
 
-        const desconto = parseFloat(document.getElementById('f-desconto')?.value) || 0;
         const data = {
             truckId,
             data: document.getElementById('f-data').value,
