@@ -365,7 +365,7 @@ Pages.freights = {
         const trucks = await db.getAll('trucks');
         let item = null;
         if (id) item = await db.getById('freights', id);
-        const currentMod = item?.modalidade || 'kmPlaca';
+        const currentMod = item?.modalidade || 'fechado';
         const modal = document.getElementById('modal-overlay');
         modal.querySelector('.modal-header h2').textContent = id ? 'Editar Frete' : 'Novo Frete';
         modal.querySelector('.modal-body').innerHTML = `
@@ -447,8 +447,8 @@ Pages.freights = {
             <div style="padding:12px;background:var(--bg-primary);border-radius:var(--radius-md)">
                 <label class="form-label" style="font-weight:700;color:var(--accent-info)">💰 Pagamento</label>
                 <select class="form-control" id="f-pagamentoTipo" onchange="Pages.freights.onPagamentoChange()" style="font-weight:600">
-                    <option value="integral" ${(item?.pagamentoTipo || 'integral') === 'integral' ? 'selected' : ''}>💵 Valor Integral</option>
-                    <option value="porcentagem" ${item?.pagamentoTipo === 'porcentagem' ? 'selected' : ''}>📊 Dividir por Porcentagem</option>
+                    <option value="integral" ${item?.pagamentoTipo === 'integral' ? 'selected' : ''}>💵 Valor Integral</option>
+                    <option value="porcentagem" ${(item?.pagamentoTipo || 'porcentagem') === 'porcentagem' ? 'selected' : ''}>📊 Dividir por Porcentagem</option>
                     <option value="valorFixo" ${item?.pagamentoTipo === 'valorFixo' ? 'selected' : ''}>✂️ Dividir por Valor Fixo</option>
                 </select>
                 <div id="pagamento-split" style="display:none;margin-top:10px">

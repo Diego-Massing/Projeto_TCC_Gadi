@@ -448,3 +448,8 @@ const App = {
 
 // ===== STARTUP =====
 document.addEventListener('DOMContentLoaded', () => App.init());
+
+// Bloqueia alteração de inputs numéricos pelo scroll do mouse
+document.addEventListener('wheel', () => {
+    if (document.activeElement?.type === 'number') document.activeElement.blur();
+}, { passive: true });
