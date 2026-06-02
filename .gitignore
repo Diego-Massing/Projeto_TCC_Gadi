@@ -12,3 +12,6 @@ Thumbs.db
 
 # Gemini/Agent files
 .gemini/
+
+# Claude Code agent files
+.claude/
