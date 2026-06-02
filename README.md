@@ -117,6 +117,13 @@ O sistema foi projetado para transportadoras e gestores de frotas que precisam d
 - Média de consumo (km/L) com seleção manual das abastecidas de início e fim
 - Inclusão automática do **salário do motorista** (sem vales) quando há fechamento salvo para o período
 
+### 🏢 Cobranças MIRO
+- Módulo exclusivo para fretes operados pela transportadora MIRO
+- Fretes marcados como MIRO são agrupados em cobranças por referência
+- **Controle de descontos:** desconto global aplicado ao total da cobrança
+- **Boletos semanais:** cada cobrança pode ter até N boletos divididos por semana, com valor, vencimento e status de pagamento
+- Visão consolidada de valores brutos, descontos e líquido a receber
+
 ### 🛞 Histórico de Pneus
 - Registro de pneus descomissionados com KM rodados
 - Ranking de marcas por durabilidade média (KM rodados por marca)
@@ -175,6 +182,7 @@ Projeto_TCC_Gadi/
 │
 ├── supabase-schema.sql                 # Schema inicial do banco de dados
 ├── supabase-migration-*.sql            # Migrações incrementais
+├── migrate.html                        # Ferramenta de migração IndexedDB → Supabase
 └── README.md
 ```
 
@@ -182,7 +190,7 @@ Projeto_TCC_Gadi/
 
 ## Banco de Dados
 
-O sistema utiliza **16 tabelas** no PostgreSQL via Supabase, todas com Row-Level Security habilitada (cada usuário acessa apenas seus próprios dados).
+O sistema utiliza **18 tabelas** no PostgreSQL via Supabase, todas com Row-Level Security habilitada (cada usuário acessa apenas seus próprios dados).
 
 | Tabela | Descrição |
 |---|---|
@@ -196,20 +204,27 @@ O sistema utiliza **16 tabelas** no PostgreSQL via Supabase, todas com Row-Level
 | `driver_bonuses` | Bônus individuais dos motoristas |
 | `driver_discounts` | Vales e adiantamentos dos motoristas |
 | `driver_closings` | Fechamentos de comissão salvos por período |
+| `truck_closings` | Fechamentos mensais salvos por caminhão |
 | `closings` | Cache de fechamentos mensais por caminhão |
 | `settings` | Configurações do sistema (chave-valor em JSON) |
 | `maintenance_plans` | Planos de manutenção preventiva por KM |
 | `tires` | Pneus atualmente instalados (por eixo/posição) |
 | `tires_history` | Histórico de pneus descomissionados |
+| `miro_cobrancas` | Cobranças agrupadas de fretes MIRO |
+| `miro_boletos` | Boletos semanais vinculados às cobranças MIRO |
 
 ### Migrações
 
 As migrações devem ser executadas na ordem no **SQL Editor do Supabase**:
 
 ```
-1. supabase-schema.sql                      → Schema inicial
-2. supabase-migration-*.sql                 → Migrações incrementais
-3. supabase-migration-driver-closings.sql   → Tabela de fechamentos salvos
+1. supabase-schema.sql                        → Schema inicial
+2. supabase-migration-001.sql                 → Colunas adicionais em app_users e despesas
+3. supabase-migration-002.sql                 → Melhorias gerais
+4. supabase-migration-003.sql                 → Pneus e planos de manutenção
+5. supabase-migration-driver-closings.sql     → Tabela de fechamentos de motoristas
+6. supabase-migration-truck-closings.sql      → Tabela de fechamentos de caminhões
+7. supabase-migration-004.sql                 → Módulo MIRO (cobranças e boletos)
 ```
 
 ---
@@ -229,6 +244,7 @@ O sistema implementa RBAC (Role-Based Access Control) com três perfis:
 | Gerenciar Usuários | ✅ | ❌ | ❌ |
 | Comissões / Fechamento | ✅ | ❌ | ❌ |
 | Fechamento Mensal | ✅ | ❌ | ❌ |
+| Cobranças MIRO | ✅ | ❌ | ❌ |
 | Configurações | ✅ | ❌ | ❌ |
 
 Motoristas visualizam apenas os dados do caminhão vinculado à sua conta.
