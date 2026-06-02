@@ -172,7 +172,7 @@ Pages.fuelings = {
             }
 
             Utils.showToast(id ? 'Atualizado!' : 'Abastecimento registrado!', 'success');
-            App.closeModal(); App.refreshCurrentPage();
+            App.closeModal(); Pages.fuelings.applyFilter();
         } catch (e) { Utils.showToast('Erro ao salvar', 'error'); } finally { this._saving = false; }
     },
 
@@ -189,7 +189,7 @@ Pages.fuelings = {
         }
 
         Utils.showToast('Excluído', 'success');
-        App.refreshCurrentPage();
+        Pages.fuelings.applyFilter();
     },
 
     async exportCSV() {
@@ -316,7 +316,11 @@ Pages.freights = {
             try { await db.delete('freights', id); deleted++; } catch (e) { console.error('Erro ao excluir frete', id, e); }
         }
         Utils.showToast(`🗑️ ${deleted} fretes excluídos!`, 'success');
-        App.refreshCurrentPage();
+        Pages.freights.applyFilter(Pages.freights._isDateRangeActive());
+    },
+
+    _isDateRangeActive() {
+        return !!(document.getElementById('filter-fr-from')?.value || document.getElementById('filter-fr-to')?.value);
     },
 
     async applyFilter(useDateRange = false) {
@@ -674,11 +678,11 @@ Pages.freights = {
                 // Actually, let's only update kmAtual securely from Fuelings which requests absolute odometer. Let's ignore it here initially unless requested.
             }
 
-            Utils.showToast(id ? 'Frete atualizado!' : 'Frete registrado!', 'success'); App.closeModal(); App.refreshCurrentPage();
+            Utils.showToast(id ? 'Frete atualizado!' : 'Frete registrado!', 'success'); App.closeModal(); Pages.freights.applyFilter(Pages.freights._isDateRangeActive());
         } catch (e) { Utils.showToast('Erro ao salvar', 'error'); } finally { this._saving = false; }
     },
 
-    async remove(id) { if (!confirm('Excluir?')) return; await db.delete('freights', id); Utils.showToast('Excluído', 'success'); App.refreshCurrentPage(); },
+    async remove(id) { if (!confirm('Excluir?')) return; await db.delete('freights', id); Utils.showToast('Excluído', 'success'); Pages.freights.applyFilter(Pages.freights._isDateRangeActive()); },
 
     async exportCSV() {
         const freights = await db.getAll('freights');
@@ -745,7 +749,7 @@ Pages.freights = {
             if (!freight) return;
             freight[campo] = !freight[campo];
             await db.update('freights', freight);
-            App.refreshCurrentPage();
+            Pages.freights.applyFilter(Pages.freights._isDateRangeActive());
         } catch (e) { console.error('toggleRecebido error:', e); }
     },
 
