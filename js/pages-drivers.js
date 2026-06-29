@@ -558,7 +558,7 @@ Pages.driverClosing = {
 
         const {
             user, placa, salarioFixo, salarioFixoBase, diasTrabalhados: dias, diasNoMes,
-            kmCarregado, kmVazio, valorKmCarregado, valorKmVazio, pctCarregado, pctVazio,
+            kmCarregado, kmVazio, totalKmCarregado, totalKmVazio, valorKmCarregado, valorKmVazio, pctCarregado, pctVazio,
             comissaoCarregado, comissaoVazio, totalComissaoKm,
             totalFreteFechado, totalComissaoFechado, kmFreteFechado, qtdFreteFechado, fixedFreights,
             mediaKmL, totalLitros, premioMedia, faixasPremioMedia, faixaAtingida,
@@ -659,8 +659,8 @@ Pages.driverClosing = {
             })()}
 
                     <div class="closing-summary" style="margin-top:20px">
-                        <div class="closing-item"><div class="closing-label">KM Carregado</div><div class="closing-value">${Utils.formatNumber(kmCarregado)}</div></div>
-                        <div class="closing-item"><div class="closing-label">KM Vazio</div><div class="closing-value">${Utils.formatNumber(kmVazio)}</div></div>
+                        <div class="closing-item"><div class="closing-label">KM Carregado</div><div class="closing-value">${Utils.formatNumber(totalKmCarregado)}</div></div>
+                        <div class="closing-item"><div class="closing-label">KM Vazio</div><div class="closing-value">${Utils.formatNumber(totalKmVazio)}</div></div>
                         <div class="closing-item"><div class="closing-label">Total Litros</div><div class="closing-value" id="closing-total-litros">${Utils.formatNumber(totalLitros, 1)}</div></div>
                         <div class="closing-item"><div class="closing-label">M\u00e9dia km/L</div><div class="closing-value" id="closing-media-kml">${mediaKmL.toFixed(2)}</div></div>
                     </div>

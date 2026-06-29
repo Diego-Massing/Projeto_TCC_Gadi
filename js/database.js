@@ -633,6 +633,8 @@ class FrotaDatabase {
 
         const kmCarregado = rateFreights.filter(f => f.tipo === 'carregado').reduce((s, f) => s + (f.km || 0), 0);
         const kmVazio = rateFreights.filter(f => f.tipo === 'vazio').reduce((s, f) => s + (f.km || 0), 0);
+        const totalKmCarregado = freights.filter(f => f.tipo === 'carregado').reduce((s, f) => s + (f.km || 0), 0);
+        const totalKmVazio = freights.filter(f => f.tipo === 'vazio').reduce((s, f) => s + (f.km || 0), 0);
         const valorKmCarregado = kmCarregado * rates.carregado;
         const valorKmVazio = kmVazio * rates.vazio;
 
@@ -671,7 +673,7 @@ class FrotaDatabase {
             truckId: truck?.id || null, placa: truck?.placa || '—',
             dataInicio, dataFim,
             salarioFixo, salarioFixoBase, diasTrabalhados, diasNoMes,
-            kmCarregado, kmVazio, valorKmCarregado, valorKmVazio,
+            kmCarregado, kmVazio, totalKmCarregado, totalKmVazio, valorKmCarregado, valorKmVazio,
             pctCarregado, pctVazio,
             comissaoCarregado, comissaoVazio, totalComissaoKm,
             totalFreteFechado, totalComissaoFechado, kmFreteFechado, qtdFreteFechado: fixedFreights.length,

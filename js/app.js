@@ -26,8 +26,8 @@ Pages.monthlyClosing = {
         this._closingsData = closings;
 
         const totalRec = closings.reduce((s, c) => s + c.totalFretes, 0);
-        const totalDesp = closings.reduce((s, c) => s + c.totalAbastecimento + c.totalMultas + (c.totalDespesas || 0), 0);
-        const saldoTotal = totalRec - totalDesp;
+        const totalDesp = closings.reduce((s, c) => s + c.totalAbastecimento + c.totalMultas + (c.totalDespesas || 0) + (c.totalDespesasFixas || 0) + (c.totalSalarioMotorista || 0), 0);
+        const saldoTotal = closings.reduce((s, c) => s + (c.saldo || 0), 0);
 
         document.getElementById('closing-results').innerHTML = `
             <div class="closing-summary animate-in mb-3">
@@ -38,7 +38,7 @@ Pages.monthlyClosing = {
             <div class="table-container"><table class="data-table"><thead><tr><th>Placa</th><th>Abast.</th><th>Out. Desp.</th><th>Fretes</th><th>Saldo</th><th>Média km/L</th></tr></thead><tbody>${closings.map((c, idx) => `<tr>
                     <td class="font-mono font-bold" style="cursor:pointer" onclick="App.navigate('truck-detail',${c.truckId})">${c.placa}</td>
                     <td class="text-danger">${Utils.formatCurrency(c.totalAbastecimento)}</td>
-                    <td class="text-danger">${Utils.formatCurrency((c.totalDespesas || 0) + c.totalMultas)} <small class="text-muted">(${c.qtdDespesas + c.qtdMultas})</small></td>
+                    <td class="text-danger">${Utils.formatCurrency((c.totalDespesas || 0) + c.totalMultas + (c.totalDespesasFixas || 0) + (c.totalSalarioMotorista || 0))} <small class="text-muted">(${c.qtdDespesas + c.qtdMultas})</small></td>
                     <td class="text-success">${Utils.formatCurrency(c.totalFretes)}</td>
                     <td class="font-bold ${c.saldo >= 0 ? 'text-success' : 'text-danger'}">${Utils.formatCurrency(c.saldo)}</td>
                     <td style="cursor:pointer" onclick="Pages.monthlyClosing.showMediaSelector(${idx})" title="Clique para ajustar"><span class="badge badge-info" id="media-badge-${idx}" style="font-size:0.85rem">${c.mediaConsumo || '—'}</span> <small class="text-muted">⚙️</small></td>

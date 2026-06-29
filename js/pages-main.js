@@ -13,7 +13,12 @@ Pages.dashboard = {
         const maintenancePlans = await db.getAll('maintenancePlans');
         const { mes, ano } = Utils.getCurrentMonth();
 
-        this._allData = { trucks, fuelings, freights, fines, truckExpenses, maintenancePlans };
+        const fixedExpensesMap = {};
+        for (const t of trucks) {
+            const fe = await db.getTruckFixedExpenses(t.id);
+            fixedExpensesMap[t.id] = fe.reduce((s, e) => s + (e.valor || 0), 0);
+        }
+        this._allData = { trucks, fuelings, freights, fines, truckExpenses, maintenancePlans, fixedExpensesMap };
 
         document.getElementById('page-content').innerHTML = `
             <div class="page-header">
@@ -38,7 +43,7 @@ Pages.dashboard = {
     },
 
     applyDashboardFilter() {
-        const { trucks, fuelings, freights, fines, truckExpenses, maintenancePlans } = this._allData;
+        const { trucks, fuelings, freights, fines, truckExpenses, maintenancePlans, fixedExpensesMap } = this._allData;
         const truckId = document.getElementById('dash-truck').value;
         const mes = parseInt(document.getElementById('dash-mes').value);
         const ano = parseInt(document.getElementById('dash-ano').value);
@@ -68,7 +73,9 @@ Pages.dashboard = {
         const totalFreightMonth = freightMonth.reduce((s, f) => s + (f.valorFrete || 0), 0);
         const totalFinesMonth = finesMonth.reduce((s, f) => s + (f.valor || 0), 0);
         const totalExpensesMonth = expensesMonth.reduce((s, f) => s + (f.valor || 0), 0);
-        const saldo = totalFreightMonth - totalFuelMonth - totalFinesMonth - totalExpensesMonth;
+        const filteredTrucks = truckId ? trucks.filter(t => t.id === parseInt(truckId)) : trucks;
+        const totalFixedMonth = (fixedExpensesMap ? filteredTrucks.reduce((s, t) => s + (fixedExpensesMap[t.id] || 0), 0) : 0);
+        const saldo = totalFreightMonth - totalFuelMonth - totalFinesMonth - totalExpensesMonth - totalFixedMonth;
         const truckLabel = truckId ? trucks.find(t => t.id === parseInt(truckId))?.placa || '' : 'Toda a frota';
 
         document.getElementById('dash-content').innerHTML = `
@@ -103,7 +110,7 @@ Pages.dashboard = {
                     <div class="card"><div class="card-header"><h3>Multas Pendentes</h3></div><div class="card-body">${this.renderFinesList(fFines, trucks)}</div></div>
                 </div>`;
 
-        this.drawCharts(fFuel, fFreight, fFines, fExpenses, trucks, mes, ano);
+        this.drawCharts(fFuel, fFreight, fFines, fExpenses, trucks, mes, ano, totalFixedMonth);
     },
 
     renderGlobalAlerts(trucks, plans, selectedTruckId) {
@@ -169,7 +176,7 @@ Pages.dashboard = {
         }).join('')}</div>`;
     },
 
-    drawCharts(fuelings, freights, fines, expenses, trucks, baseMes, baseAno) {
+    drawCharts(fuelings, freights, fines, expenses, trucks, baseMes, baseAno, totalFixedExpenses = 0) {
         // Revenue vs Expenses - 6 months ending at selected period
         const refDate = new Date(baseAno, baseMes - 1, 1);
         const months = [];
@@ -200,7 +207,8 @@ Pages.dashboard = {
         const donutData = [
             { label: 'Combust\u00edvel', value: totalFuel },
             { label: 'Multas', value: totalFines },
-            ...expSlices
+            ...expSlices,
+            ...(totalFixedExpenses > 0 ? [{ label: 'Desp. Fixas', value: totalFixedExpenses }] : [])
         ].filter(d => d.value > 0);
         const totalGastos = donutData.reduce((s, d) => s + d.value, 0);
         const donutColors = ['#f59e0b', '#ef4444', '#8b5cf6', '#3b82f6', '#06b6d4', '#84cc16', '#ec4899', '#14b8a6'];
