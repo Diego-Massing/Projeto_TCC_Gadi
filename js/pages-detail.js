@@ -667,7 +667,9 @@ Pages.truckDetail = {
                 motivo: motivo
             });
 
-            await db.delete('tires', id);
+            const { data: deleted, error: delError } = await supabase.from('tires').delete().eq('id', id).select();
+            if (delError) throw delError;
+            if (!deleted || deleted.length === 0) throw new Error('Pneu não removido — verifique permissões');
             Utils.showToast('Pneu arquivado e desmontado!', 'success');
             App.closeModal();
             this.render(this.truckId);
