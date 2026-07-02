@@ -202,7 +202,7 @@ Projeto_TCC_Gadi/
 
 ## Banco de Dados
 
-O sistema utiliza **18 tabelas** no PostgreSQL via Supabase, todas com Row-Level Security habilitada (cada usuário acessa apenas seus próprios dados).
+O sistema utiliza **18 tabelas** no PostgreSQL via Supabase, todas com Row-Level Security habilitada. Os dados são compartilhados entre todos os admins/visualizadores da mesma frota (não isolados por conta) — o acesso é controlado pelo **role** de cada usuário em `app_users` (`admin`, `motorista`, `visualizador`), verificado no próprio banco via as funções `current_app_role()`/`current_app_truck_id()`. Motoristas só enxergam abastecimentos e fretes do caminhão vinculado à sua conta.
 
 | Tabela | Descrição |
 |---|---|
@@ -238,6 +238,7 @@ As migrações devem ser executadas na ordem no **SQL Editor do Supabase**:
 6. supabase-migration-truck-closings.sql      → Tabela de fechamentos de caminhões
 7. supabase-migration-004.sql                 → Módulo MIRO (cobranças e boletos)
 8. supabase-migration-005.sql                 → Integração Sascar (function de secrets + cron job)
+9. supabase-migration-006.sql                 → RBAC de verdade via RLS (checa role em app_users)
 ```
 
 ---
