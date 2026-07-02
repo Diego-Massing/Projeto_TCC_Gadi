@@ -121,11 +121,13 @@ Pages.kmReport = {
                 <div class="filter-bar">
                     <div class="form-group"><label class="form-label">De</label><input type="date" class="form-control" id="km-date-from" value="${monday.toISOString().slice(0, 10)}"></div>
                     <div class="form-group"><label class="form-label">Até</label><input type="date" class="form-control" id="km-date-to" value="${today.toISOString().slice(0, 10)}"></div>
-                    <div class="form-group"><label class="form-label">&nbsp;</label><button class="btn btn-secondary" onclick="Pages.kmReport.setRange('week')">Semana atual</button></div>
-                    <div class="form-group"><label class="form-label">&nbsp;</label><button class="btn btn-secondary" onclick="Pages.kmReport.setRange('lastWeek')">Semana passada</button></div>
-                    <div class="form-group"><label class="form-label">&nbsp;</label><button class="btn btn-secondary" onclick="Pages.kmReport.setRange('month')">Mês atual</button></div>
-                    <div class="form-group"><label class="form-label">&nbsp;</label><button class="btn btn-secondary" onclick="Pages.kmReport.setRange('lastMonth')">Mês passado</button></div>
-                    <div class="form-group"><label class="form-label">&nbsp;</label><button class="btn btn-primary" onclick="Pages.kmReport.consultar()" id="km-consultar-btn">Consultar</button></div>
+                    <button class="btn btn-primary" onclick="Pages.kmReport.consultar()" id="km-consultar-btn">Consultar</button>
+                </div>
+                <div class="btn-group mb-3">
+                    <button class="btn btn-secondary btn-sm" onclick="Pages.kmReport.setRange('week')">Semana atual</button>
+                    <button class="btn btn-secondary btn-sm" onclick="Pages.kmReport.setRange('lastWeek')">Semana passada</button>
+                    <button class="btn btn-secondary btn-sm" onclick="Pages.kmReport.setRange('month')">Mês atual</button>
+                    <button class="btn btn-secondary btn-sm" onclick="Pages.kmReport.setRange('lastMonth')">Mês passado</button>
                 </div>
                 ${trucks.length === 0 ? '<div class="empty-state"><div class="empty-icon">🚛</div><h3>Nenhum caminhão cadastrado</h3><p>Cadastre os caminhões (placa) na tela de Caminhões antes de consultar.</p></div>' : ''}
                 <div id="km-report-result"></div>
@@ -133,7 +135,7 @@ Pages.kmReport = {
     },
 
     setFilterButtonsDisabled(disabled) {
-        document.querySelectorAll('#page-content .filter-bar button').forEach(b => b.disabled = disabled);
+        document.querySelectorAll('#page-content .filter-bar button, #page-content .btn-group button').forEach(b => b.disabled = disabled);
     },
 
     setRange(kind) {
@@ -192,7 +194,7 @@ Pages.kmReport = {
             resultEl.innerHTML = `
                 <div class="card"><div class="card-body text-center">
                     <div class="spinner" style="margin-bottom:10px"></div>
-                    <p class="text-muted" style="margin-bottom:10px">Consultando Sascar — 1 login + 1 chamada por caminhão (${trucks.length} caminhões). Pode levar até ${Math.max(20, trucks.length * 3)}s...</p>
+                    <p class="text-muted" style="margin-bottom:10px">Consultando Sascar — 1 login + 1 chamada por caminhão (${trucks.length} caminhões). Pode levar até ${Math.max(40, trucks.length * 5)}s...</p>
                     <div class="progress-bar-track" style="max-width:400px;margin:0 auto"></div>
                     <p class="text-muted" style="margin-top:8px;font-size:0.78rem">${secs}s</p>
                 </div></div>`;
