@@ -129,6 +129,13 @@ O sistema foi projetado para transportadoras e gestores de frotas que precisam d
 - Ranking de marcas por durabilidade média (KM rodados por marca)
 - Histórico completo de movimentações por posição e eixo
 
+### 🛣️ KM Rodado (Sascar)
+- Consulta o hodômetro real dos caminhões via integração com a Sascar/Michelin MyConnectedFleet
+- Calcula o KM rodado por caminhão num período (semana/mês, com atalhos de "atual" e "passado(a)")
+- Botão "Atualizar KM agora" sincroniza o `kmAtual` de todos os caminhões sob demanda
+- Sincronização automática diária (cron às 03:00) mantém o `kmAtual` sempre atualizado
+- Toda a comunicação com a Sascar roda em Supabase Edge Functions (`supabase/functions/sascar-sync` e `sascar-km-report`); credenciais ficam só no Supabase Vault, nunca no código
+
 ### ⚙️ Configurações
 - **Taxas R$/KM padrão:** carregado e vazio (aplicados quando não há taxa específica do caminhão)
 - **Comissões padrão:** percentuais para KM carregado e vazio
@@ -178,7 +185,12 @@ Projeto_TCC_Gadi/
 │   ├── pages-data.js                   # Páginas: Abastecimentos, Fretes, Multas, Despesas
 │   ├── pages-detail.js                 # Página: Detalhes do Caminhão (abas)
 │   ├── pages-drivers.js                # Páginas: Usuários e Comissões
-│   └── pages-extra.js                  # Páginas: Configurações, Pneus, Importação
+│   └── pages-extra.js                  # Páginas: Configurações, Pneus, Importação, KM Rodado (Sascar)
+│
+├── supabase/functions/                 # Edge Functions (Deno) — integração Sascar/Michelin
+│   ├── _shared/sascar.ts               # Cliente Sascar: login PKCE, posições, hodômetro
+│   ├── sascar-sync/                    # Atualiza kmAtual dos caminhões (cron diário + botão manual)
+│   └── sascar-km-report/               # Calcula KM rodado por caminhão num período
 │
 ├── supabase-schema.sql                 # Schema inicial do banco de dados
 ├── supabase-migration-*.sql            # Migrações incrementais
@@ -225,6 +237,7 @@ As migrações devem ser executadas na ordem no **SQL Editor do Supabase**:
 5. supabase-migration-driver-closings.sql     → Tabela de fechamentos de motoristas
 6. supabase-migration-truck-closings.sql      → Tabela de fechamentos de caminhões
 7. supabase-migration-004.sql                 → Módulo MIRO (cobranças e boletos)
+8. supabase-migration-005.sql                 → Integração Sascar (function de secrets + cron job)
 ```
 
 ---

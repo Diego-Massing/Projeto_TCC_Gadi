@@ -102,6 +102,140 @@ Pages.tiresAnalytics = {
     }
 };
 
+// ===== KM RODADO (SASCAR) REPORT PAGE =====
+Pages.kmReport = {
+    lastResult: null,
+
+    async render() {
+        const trucks = await db.getAll('trucks');
+        const today = new Date();
+        const monday = new Date(today);
+        monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+
+        document.getElementById('page-content').innerHTML = `
+            <div class="page-header"><div class="page-header-row">
+                <div><h1 class="page-title">🛣️ KM Rodado (Sascar)</h1><p class="page-subtitle">Consulta o hodômetro da Sascar/Michelin para calcular o KM rodado por caminhão num período</p></div>
+                <button class="btn btn-secondary" onclick="Pages.kmReport.syncNow()" id="km-sync-btn">🔄 Atualizar KM agora</button>
+            </div></div>
+            <div class="page-body">
+                <div class="filter-bar">
+                    <div class="form-group"><label class="form-label">De</label><input type="date" class="form-control" id="km-date-from" value="${monday.toISOString().slice(0, 10)}"></div>
+                    <div class="form-group"><label class="form-label">Até</label><input type="date" class="form-control" id="km-date-to" value="${today.toISOString().slice(0, 10)}"></div>
+                    <div class="form-group"><label class="form-label">&nbsp;</label><button class="btn btn-secondary" onclick="Pages.kmReport.setRange('week')">Semana atual</button></div>
+                    <div class="form-group"><label class="form-label">&nbsp;</label><button class="btn btn-secondary" onclick="Pages.kmReport.setRange('lastWeek')">Semana passada</button></div>
+                    <div class="form-group"><label class="form-label">&nbsp;</label><button class="btn btn-secondary" onclick="Pages.kmReport.setRange('month')">Mês atual</button></div>
+                    <div class="form-group"><label class="form-label">&nbsp;</label><button class="btn btn-secondary" onclick="Pages.kmReport.setRange('lastMonth')">Mês passado</button></div>
+                    <div class="form-group"><label class="form-label">&nbsp;</label><button class="btn btn-primary" onclick="Pages.kmReport.consultar()" id="km-consultar-btn">Consultar</button></div>
+                </div>
+                ${trucks.length === 0 ? '<div class="empty-state"><div class="empty-icon">🚛</div><h3>Nenhum caminhão cadastrado</h3><p>Cadastre os caminhões (placa) na tela de Caminhões antes de consultar.</p></div>' : ''}
+                <div id="km-report-result"></div>
+            </div>`;
+    },
+
+    setFilterButtonsDisabled(disabled) {
+        document.querySelectorAll('#page-content .filter-bar button').forEach(b => b.disabled = disabled);
+    },
+
+    setRange(kind) {
+        const today = new Date();
+        let from, to = today;
+        if (kind === 'week') {
+            from = new Date(today);
+            from.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+        } else if (kind === 'lastWeek') {
+            const thisMonday = new Date(today);
+            thisMonday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+            from = new Date(thisMonday);
+            from.setDate(thisMonday.getDate() - 7);
+            to = new Date(thisMonday);
+            to.setDate(thisMonday.getDate() - 1);
+        } else if (kind === 'month') {
+            from = new Date(today.getFullYear(), today.getMonth(), 1);
+        } else if (kind === 'lastMonth') {
+            from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            to = new Date(today.getFullYear(), today.getMonth(), 0);
+        }
+        document.getElementById('km-date-from').value = from.toISOString().slice(0, 10);
+        document.getElementById('km-date-to').value = to.toISOString().slice(0, 10);
+    },
+
+    async syncNow() {
+        const btn = document.getElementById('km-sync-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner" style="width:12px;height:12px;border-width:2px"></span> Atualizando...';
+        try {
+            const { data, error } = await supabase.functions.invoke('sascar-sync');
+            if (error) throw error;
+            Utils.showToast(`${data.atualizados} caminhões atualizados com o KM da Sascar!`, 'success');
+        } catch (e) {
+            console.error('sascar-sync error:', e);
+            Utils.showToast('Erro ao atualizar KM: ' + (e.message || 'falha na integração Sascar'), 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '🔄 Atualizar KM agora';
+        }
+    },
+
+    async consultar() {
+        const dateFrom = document.getElementById('km-date-from').value;
+        const dateTo = document.getElementById('km-date-to').value;
+        if (!dateFrom || !dateTo) { Utils.showToast('Informe as duas datas', 'warning'); return; }
+        if (dateFrom > dateTo) { Utils.showToast('Data inicial deve ser antes da data final', 'warning'); return; }
+
+        const trucks = await db.getAll('trucks');
+        const resultEl = document.getElementById('km-report-result');
+        this.setFilterButtonsDisabled(true);
+
+        const startedAt = Date.now();
+        const renderLoading = () => {
+            const secs = Math.floor((Date.now() - startedAt) / 1000);
+            resultEl.innerHTML = `
+                <div class="card"><div class="card-body text-center">
+                    <div class="spinner" style="margin-bottom:10px"></div>
+                    <p class="text-muted" style="margin-bottom:10px">Consultando Sascar — 1 login + 1 chamada por caminhão (${trucks.length} caminhões). Pode levar até ${Math.max(20, trucks.length * 3)}s...</p>
+                    <div class="progress-bar-track" style="max-width:400px;margin:0 auto"></div>
+                    <p class="text-muted" style="margin-top:8px;font-size:0.78rem">${secs}s</p>
+                </div></div>`;
+        };
+        renderLoading();
+        const timer = setInterval(renderLoading, 1000);
+
+        try {
+            const { data, error } = await supabase.functions.invoke('sascar-km-report', { body: { dateFrom, dateTo } });
+            if (error) throw error;
+            this.lastResult = data;
+            resultEl.innerHTML = this.renderResult(data);
+        } catch (e) {
+            console.error('sascar-km-report error:', e);
+            resultEl.innerHTML = `<div class="card"><div class="card-body text-center" style="color:var(--accent-danger)">Erro ao consultar: ${e.message || 'falha na integração Sascar'}</div></div>`;
+        } finally {
+            clearInterval(timer);
+            this.setFilterButtonsDisabled(false);
+        }
+    },
+
+    renderResult(data) {
+        const rows = data.resultados || [];
+        return `
+            <div class="stats-grid animate-in" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr))">
+                <div class="stat-card" style="--stat-accent: var(--gradient-primary)">
+                    <div class="stat-icon">🛣️</div>
+                    <div class="stat-value">${Utils.formatNumber(data.total, 1)}</div>
+                    <div class="stat-label">Total KM rodado (${Utils.formatDate(data.dateFrom)} — ${Utils.formatDate(data.dateTo)})</div>
+                </div>
+            </div>
+            <div class="table-container"><table class="data-table">
+                <thead><tr><th>Placa</th><th>KM Início</th><th>KM Fim</th><th>KM Rodado</th></tr></thead>
+                <tbody>${rows.map(r => `<tr>
+                    <td class="font-mono font-bold">${r.placa}</td>
+                    <td>${r.kmInicio != null ? Utils.formatNumber(r.kmInicio, 1) : '—'}</td>
+                    <td>${r.kmFim != null ? Utils.formatNumber(r.kmFim, 1) : '—'}</td>
+                    <td class="${r.kmRodado != null ? 'font-bold text-success' : 'text-muted'}">${r.kmRodado != null ? Utils.formatNumber(r.kmRodado, 1) + ' KM' : (r.erro || '—')}</td>
+                </tr>`).join('')}</tbody>
+            </table></div>`;
+    }
+};
+
 // ===== FINES PAGE =====
 Pages.fines = {
     async render() {
