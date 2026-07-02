@@ -242,12 +242,42 @@ export async function getKmForRange(
   const resp = await fetch(POSICOES_URL, { method: "POST", headers: bffHeaders(session.bffToken), body: JSON.stringify(body) });
   if (!resp.ok) throw new Error(`posicoes falhou: ${resp.status}`);
   const data = await resp.json();
+  // Sob concorrência alta a Sascar às vezes responde 200 com corpo `null` (provável rate limit).
+  if (!data) throw new Error("Resposta vazia da Sascar (rate limit?)");
   const payload: any[] = data.payload || [];
   if (!payload.length) return null;
   return {
     kmInicio: Number(payload[0].hodometer),
     kmFim: Number(payload[payload.length - 1].hodometer),
   };
+}
+
+/** Runs async tasks with a max concurrency, so we don't hammer the Sascar API and trigger rate limiting. */
+export async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+/** Retries a flaky async call a couple of times before giving up. */
+export async function withRetry<T>(fn: () => Promise<T>, attempts = 3, delayMs = 400): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      if (i < attempts - 1) await new Promise((r) => setTimeout(r, delayMs * (i + 1)));
+    }
+  }
+  throw lastErr;
 }
 
 /** SP (UTC-3) midnight/end-of-day epoch ms helpers. */

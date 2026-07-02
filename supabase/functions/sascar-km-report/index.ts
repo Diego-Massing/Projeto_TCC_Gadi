@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { CORS_HEADERS, getKmForRange, listVehiclePositions, normalizePlaca, sascarLogin, spDayEndMs, spDayStartMs } from "../_shared/sascar.ts";
+import { CORS_HEADERS, getKmForRange, listVehiclePositions, mapWithConcurrency, normalizePlaca, sascarLogin, spDayEndMs, spDayStartMs, withRetry } from "../_shared/sascar.ts";
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -39,15 +39,16 @@ Deno.serve(async (req: Request) => {
     const dateFromMs = spDayStartMs(dateFrom);
     const dateToMs = spDayEndMs(dateTo);
 
-    // One HTTP round-trip per truck to Sascar — firing them sequentially for a full
-    // fleet easily blows past the edge function's wall-clock limit, so run them in parallel.
-    const resultados = await Promise.all((trucks ?? []).map(async (truck) => {
+    // Um round-trip por caminhão à Sascar. Disparar tudo de uma vez estoura o timeout
+    // da function (sequencial) ou faz a Sascar responder corpo vazio sob carga (paralelo
+    // irrestrito) — por isso: no máx. 4 chamadas simultâneas, com retry em cada uma.
+    const resultados = await mapWithConcurrency(trucks ?? [], 4, async (truck) => {
       const match = byPlaca.get(normalizePlaca(truck.placa));
       if (!match) {
         return { truckId: truck.id, placa: truck.placa, kmInicio: null, kmFim: null, kmRodado: null, erro: "Placa não encontrada na Sascar" };
       }
       try {
-        const range = await getKmForRange(session, match.identifierVehicle, dateFromMs, dateToMs);
+        const range = await withRetry(() => getKmForRange(session, match.identifierVehicle, dateFromMs, dateToMs));
         if (!range) {
           return { truckId: truck.id, placa: truck.placa, kmInicio: null, kmFim: null, kmRodado: null, erro: "Sem posições no período" };
         }
@@ -61,7 +62,7 @@ Deno.serve(async (req: Request) => {
       } catch (e) {
         return { truckId: truck.id, placa: truck.placa, kmInicio: null, kmFim: null, kmRodado: null, erro: e instanceof Error ? e.message : String(e) };
       }
-    }));
+    });
 
     const total = resultados.reduce((s, r) => s + (r.kmRodado || 0), 0);
     return new Response(JSON.stringify({ dateFrom, dateTo, resultados, total }), {
