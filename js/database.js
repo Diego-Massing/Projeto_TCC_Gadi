@@ -635,8 +635,16 @@ class FrotaDatabase {
         const kmVazio = rateFreights.filter(f => f.tipo === 'vazio').reduce((s, f) => s + (f.km || 0), 0);
         const totalKmCarregado = freights.filter(f => f.tipo === 'carregado').reduce((s, f) => s + (f.km || 0), 0);
         const totalKmVazio = freights.filter(f => f.tipo === 'vazio').reduce((s, f) => s + (f.km || 0), 0);
-        const valorKmCarregado = kmCarregado * rates.carregado;
-        const valorKmVazio = kmVazio * rates.vazio;
+
+        // Taxa R$/km usada na COMISSÃO do motorista: se ele tiver taxa própria cadastrada,
+        // usa ela; senão cai para a taxa da placa/padrão (mesma usada no valor do frete).
+        const commRates = {
+            carregado: (user.valorKmCarregado !== null && user.valorKmCarregado !== undefined) ? user.valorKmCarregado : rates.carregado,
+            vazio: (user.valorKmVazio !== null && user.valorKmVazio !== undefined) ? user.valorKmVazio : rates.vazio,
+            isCustom: (user.valorKmCarregado !== null && user.valorKmCarregado !== undefined) || (user.valorKmVazio !== null && user.valorKmVazio !== undefined)
+        };
+        const valorKmCarregado = kmCarregado * commRates.carregado;
+        const valorKmVazio = kmVazio * commRates.vazio;
 
         const totalFreteFechado = fixedFreights.reduce((s, f) => s + (f.valorFrete || 0), 0);
         const totalComissaoFechado = fixedFreights.reduce((s, f) => s + (f.comissaoFechado || f.valorFrete || 0), 0);
@@ -687,6 +695,7 @@ class FrotaDatabase {
             qtdFretes: freights.length,
             freights: freights.sort((a, b) => (a.data || '').localeCompare(b.data || '')), fuelings, fuelingsForMedia,
             rates, ratesIsCustom: rates.isCustom || false,
+            commRates, commRatesIsCustom: commRates.isCustom || false,
             geradoEm: new Date().toISOString()
         };
     }

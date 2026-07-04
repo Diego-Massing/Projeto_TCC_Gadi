@@ -64,6 +64,11 @@ Pages.users = {
                     <div class="form-group"><label class="form-label">% Comissão KM Vazio</label><input type="number" step="0.1" class="form-control" id="f-comKmVazio" value="${user?.comKmVazio ?? ''}" placeholder="Usar padrão do sistema"></div>
                 </div>
                 <p class="text-muted" style="font-size:0.75rem;margin-top:-8px">Deixe em branco para usar % padrão das Configurações.</p>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">R$/KM Carregado (comissão do motorista)</label><input type="number" step="0.01" class="form-control" id="f-valorKmCarregado" value="${user?.valorKmCarregado ?? ''}" placeholder="Usar taxa da placa/padrão"></div>
+                    <div class="form-group"><label class="form-label">R$/KM Vazio (comissão do motorista)</label><input type="number" step="0.01" class="form-control" id="f-valorKmVazio" value="${user?.valorKmVazio ?? ''}" placeholder="Usar taxa da placa/padrão"></div>
+                </div>
+                <p class="text-muted" style="font-size:0.75rem;margin-top:-8px">Só afeta o cálculo da comissão deste motorista. O km e o valor do frete continuam sendo lançados normalmente na tela de Fretes, usando a taxa da placa. Deixe em branco para a comissão continuar usando a taxa da placa/padrão.</p>
             </div>
             <div class="form-group"><label class="form-label">Observações</label><input type="text" class="form-control" id="f-obs" value="${user?.obs || ''}"></div>
             <hr style="border-color:#333;margin:16px 0">
@@ -120,9 +125,11 @@ Pages.users = {
             salarioFixo: parseFloat(document.getElementById('f-salarioFixo').value) || 0,
             comKmCarregado: document.getElementById('f-comKmCarregado').value !== '' ? parseFloat(document.getElementById('f-comKmCarregado').value) : null,
             comKmVazio: document.getElementById('f-comKmVazio').value !== '' ? parseFloat(document.getElementById('f-comKmVazio').value) : null,
+            valorKmCarregado: document.getElementById('f-valorKmCarregado').value !== '' ? parseFloat(document.getElementById('f-valorKmCarregado').value) : null,
+            valorKmVazio: document.getElementById('f-valorKmVazio').value !== '' ? parseFloat(document.getElementById('f-valorKmVazio').value) : null,
             obs: document.getElementById('f-obs').value.trim()
         };
-        if (role !== 'motorista') { data.truckId = null; data.salarioFixo = 0; data.comKmCarregado = null; data.comKmVazio = null; }
+        if (role !== 'motorista') { data.truckId = null; data.salarioFixo = 0; data.comKmCarregado = null; data.comKmVazio = null; data.valorKmCarregado = null; data.valorKmVazio = null; }
 
         try {
             // If temLogin is true and this is a NEW user, create auth account via signUp
@@ -564,7 +571,7 @@ Pages.driverClosing = {
             mediaKmL, totalLitros, premioMedia, faixasPremioMedia, faixaAtingida,
             expenses, bonuses, discounts,
             totalExpenses, totalBonuses, totalDiscounts,
-            totalPagar, freights, fuelings, fuelingsForMedia, rates, ratesIsCustom
+            totalPagar, freights, fuelings, fuelingsForMedia, rates, ratesIsCustom, commRates, commRatesIsCustom
         } = closingData;
 
         // Build tiered bonus display
@@ -577,7 +584,8 @@ Pages.driverClosing = {
             </tr>`;
         }).join('') : '<tr><td style="padding-left:24px" class="text-muted">Nenhuma faixa de pr\u00eamio configurada</td><td></td></tr>';
 
-        const ratesLabel = ratesIsCustom ? `\ud83d\ude9b Taxa da placa: ${Utils.formatCurrency(rates.carregado)}/km (C) | ${Utils.formatCurrency(rates.vazio)}/km (V)` : `\u2699\ufe0f Taxa padr\u00e3o: ${Utils.formatCurrency(rates.carregado)}/km (C) | ${Utils.formatCurrency(rates.vazio)}/km (V)`;
+        const ratesLabel = ratesIsCustom ? `\ud83d\ude9b Taxa da placa (frete): ${Utils.formatCurrency(rates.carregado)}/km (C) | ${Utils.formatCurrency(rates.vazio)}/km (V)` : `\u2699\ufe0f Taxa padr\u00e3o (frete): ${Utils.formatCurrency(rates.carregado)}/km (C) | ${Utils.formatCurrency(rates.vazio)}/km (V)`;
+        const commRatesLabel = commRatesIsCustom ? `\ud83d\udc64 Taxa do motorista (comiss\u00e3o): ${Utils.formatCurrency(commRates.carregado)}/km (C) | ${Utils.formatCurrency(commRates.vazio)}/km (V)` : `\u2699\ufe0f Comiss\u00e3o usando taxa da placa/padr\u00e3o (motorista sem taxa pr\u00f3pria cadastrada)`;
 
         // Detailed Freights Table (Routes)
         const routesTable = freights.length > 0 ? `
@@ -610,6 +618,7 @@ Pages.driverClosing = {
                     <div style="margin-bottom:8px;color:var(--text-secondary);font-size:0.82rem">
                         Caminh\u00e3o: <strong class="font-mono">${placa || 'Nenhum'}</strong> \u2014 ${freights.length} fretes no per\u00edodo
                         <br><span style="font-size:0.75rem">${ratesLabel}</span>
+                        <br><span style="font-size:0.75rem">${commRatesLabel}</span>
                     </div>
 
                     <h4 style="margin:16px 0 10px;font-size:0.85rem;color:var(--accent-primary)">\ud83d\udcb0 COMPOSI\u00c7\u00c3O DO PAGAMENTO</h4>
@@ -618,8 +627,8 @@ Pages.driverClosing = {
                             <thead><tr><th>Descri\u00e7\u00e3o</th><th class="text-right">Valor</th></tr></thead>
                             <tbody>
                                 ${salarioFixo > 0 ? `<tr><td>Sal\u00e1rio Fixo${dias < diasNoMes ? ' <small class="text-muted">(' + dias + '/' + diasNoMes + ' dias — proporcional de ' + Utils.formatCurrency(salarioFixoBase) + ')</small>' : ''}</td><td class="text-right font-bold">${Utils.formatCurrency(salarioFixo)}</td></tr>` : ''}
-                                ${comissaoCarregado > 0 ? `<tr><td>Comiss\u00e3o KM Carregado \u2014 ${Utils.formatNumber(kmCarregado)} km \u00d7 ${Utils.formatCurrency(rates.carregado)}/km \u00d7 ${pctCarregado}%</td><td class="text-right font-bold text-success">${Utils.formatCurrency(comissaoCarregado)}</td></tr>` : ''}
-                                ${comissaoVazio > 0 ? `<tr><td>Comiss\u00e3o KM Vazio \u2014 ${Utils.formatNumber(kmVazio)} km \u00d7 ${Utils.formatCurrency(rates.vazio)}/km \u00d7 ${pctVazio}%</td><td class="text-right font-bold text-success">${Utils.formatCurrency(comissaoVazio)}</td></tr>` : ''}
+                                ${comissaoCarregado > 0 ? `<tr><td>Comiss\u00e3o KM Carregado \u2014 ${Utils.formatNumber(kmCarregado)} km \u00d7 ${Utils.formatCurrency(commRates.carregado)}/km \u00d7 ${pctCarregado}%</td><td class="text-right font-bold text-success">${Utils.formatCurrency(comissaoCarregado)}</td></tr>` : ''}
+                                ${comissaoVazio > 0 ? `<tr><td>Comiss\u00e3o KM Vazio \u2014 ${Utils.formatNumber(kmVazio)} km \u00d7 ${Utils.formatCurrency(commRates.vazio)}/km \u00d7 ${pctVazio}%</td><td class="text-right font-bold text-success">${Utils.formatCurrency(comissaoVazio)}</td></tr>` : ''}
                                 ${(qtdFreteFechado || 0) > 0 ? `<tr style="background:rgba(99,102,241,0.05)"><td>\ud83d\udd12 Fretes Valor Fechado (${qtdFreteFechado}x \u2014 ${Utils.formatNumber(kmFreteFechado)} km) \u2014 Comiss\u00e3o</td><td class="text-right font-bold text-success">${Utils.formatCurrency(totalComissaoFechado)}</td></tr>` : ''}
                                 ${premioMedia > 0 ? `<tr style="background:rgba(34,197,94,0.05)"><td><strong>\ud83c\udfc6 Pr\u00eamio M\u00e9dia km/L</strong> \u2014 M\u00e9dia atual: <strong>${mediaKmL.toFixed(2)} km/L</strong></td><td class="text-right font-bold text-success">${Utils.formatCurrency(premioMedia)}</td></tr>` : ''}
                                 ${faixasHtml}
@@ -932,8 +941,8 @@ Pages.driverClosing = {
                 <thead><tr><th>Descrição</th><th class="text-right">Valor</th></tr></thead>
                 <tbody>
                     ${c.salarioFixo > 0 ? `<tr><td>Salário Fixo${c.diasTrabalhados < c.diasNoMes ? ' <small style="color:#888">(${c.diasTrabalhados}/${c.diasNoMes} dias — proporcional de ${Utils.formatCurrency(c.salarioFixoBase)})</small>' : ''}</td><td class="text-right">${Utils.formatCurrency(c.salarioFixo)}</td></tr>` : ''}
-                    ${c.comissaoCarregado > 0 ? `<tr><td>Comissão KM Carregado — ${Utils.formatNumber(c.kmCarregado)} km × ${Utils.formatCurrency(c.rates.carregado)}/km × ${c.pctCarregado}%${c.ratesIsCustom ? ' (taxa da placa)' : ''}</td><td class="text-right">${Utils.formatCurrency(c.comissaoCarregado)}</td></tr>` : ''}
-                    ${c.comissaoVazio > 0 ? `<tr><td>Comissão KM Vazio — ${Utils.formatNumber(c.kmVazio)} km × ${Utils.formatCurrency(c.rates.vazio)}/km × ${c.pctVazio}%${c.ratesIsCustom ? ' (taxa da placa)' : ''}</td><td class="text-right">${Utils.formatCurrency(c.comissaoVazio)}</td></tr>` : ''}
+                    ${c.comissaoCarregado > 0 ? `<tr><td>Comissão KM Carregado — ${Utils.formatNumber(c.kmCarregado)} km × ${Utils.formatCurrency(c.commRates.carregado)}/km × ${c.pctCarregado}%${c.commRatesIsCustom ? ' (taxa própria do motorista)' : ' (taxa da placa/padrão)'}</td><td class="text-right">${Utils.formatCurrency(c.comissaoCarregado)}</td></tr>` : ''}
+                    ${c.comissaoVazio > 0 ? `<tr><td>Comissão KM Vazio — ${Utils.formatNumber(c.kmVazio)} km × ${Utils.formatCurrency(c.commRates.vazio)}/km × ${c.pctVazio}%${c.commRatesIsCustom ? ' (taxa própria do motorista)' : ' (taxa da placa/padrão)'}</td><td class="text-right">${Utils.formatCurrency(c.comissaoVazio)}</td></tr>` : ''}
                     ${(c.qtdFreteFechado || 0) > 0 ? `<tr style="background:#f0f0ff"><td>🔒 Fretes Valor Fechado (${c.qtdFreteFechado}x — ${Utils.formatNumber(c.kmFreteFechado)} km) — Comissão</td><td class="text-right"><strong>${Utils.formatCurrency(c.totalComissaoFechado)}</strong></td></tr>` : ''}
                     ${c.premioMedia > 0 ? `<tr style="background:#f0fff0"><td><strong>Prêmio Média km/L</strong> — Média atual: <strong>${c.mediaKmL} km/L</strong></td><td class="text-right"><strong>${Utils.formatCurrency(c.premioMedia)}</strong></td></tr>` : ''}
                     ${(c.faixasPremioMedia || []).sort((a, b) => a.minMedia - b.minMedia).map(f => {

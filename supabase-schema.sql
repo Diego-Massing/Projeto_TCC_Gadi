@@ -11,6 +11,8 @@ create table if not exists public.app_users (
     "salarioFixo" numeric,
     "comKmCarregado" numeric,
     "comKmVazio" numeric,
+    "valorKmCarregado" numeric, -- R$/km carregado usado só na comissão deste motorista (se null, usa taxa da placa/padrão)
+    "valorKmVazio" numeric, -- R$/km vazio usado só na comissão deste motorista (se null, usa taxa da placa/padrão)
     created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 alter table public.app_users enable row level security;
