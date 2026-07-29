@@ -463,12 +463,15 @@ Pages.dataImport = {
     csvData: null,
     rawText: null,
     fileName: '',
+    sourceMode: 'upload',
+    lastFuelingRows: null,
+    lastFreightRows: null,
     async render() {
         document.getElementById('page-content').innerHTML = `
-            <div class="page-header"><div class="page-header-row"><div><h1 class="page-title">📤 Importar Dados</h1><p class="page-subtitle">Migre dados do Google Planilhas via CSV</p></div></div></div>
+            <div class="page-header"><div class="page-header-row"><div><h1 class="page-title">📤 Importar Dados</h1><p class="page-subtitle">Migre dados do Google Planilhas via CSV ou colando direto da planilha</p></div></div></div>
             <div class="page-body">
                 <div class="import-steps mb-3">
-                    <div class="import-step active"><div class="step-number">1</div><div class="step-label">Upload CSV</div></div>
+                    <div class="import-step active"><div class="step-number">1</div><div class="step-label">Upload / Colar</div></div>
                     <div class="import-step"><div class="step-number">2</div><div class="step-label">Configurar</div></div>
                     <div class="import-step"><div class="step-number">3</div><div class="step-label">Importar</div></div>
                 </div>
@@ -482,12 +485,30 @@ Pages.dataImport = {
                         <option value="trucks">🚛 Caminhões — CSV Genérico</option>
                     </select></div>
                     <div id="import-type-help" class="mb-2" style="font-size:0.82rem;color:var(--text-secondary)"></div>
-                    <div class="file-upload-area" id="csv-drop-area" onclick="document.getElementById('csv-file-input').click()">
-                        <div class="upload-icon">📁</div>
-                        <h3>Arraste o arquivo CSV aqui</h3>
-                        <p>ou clique para selecionar — Aceita arquivos .csv exportados do Google Planilhas</p>
+
+                    <div id="import-source-toggle" class="mb-2" style="display:none">
+                        <button type="button" class="btn btn-sm" id="source-btn-upload" onclick="Pages.dataImport.setSourceMode('upload')">📁 Upload CSV</button>
+                        <button type="button" class="btn btn-sm" id="source-btn-paste" onclick="Pages.dataImport.setSourceMode('paste')">📋 Colar da Planilha (Ctrl+V)</button>
                     </div>
-                    <input type="file" id="csv-file-input" accept=".csv,.txt" style="display:none" onchange="Pages.dataImport.handleFile(event)">
+
+                    <div id="csv-source-area">
+                        <div class="file-upload-area" id="csv-drop-area" onclick="document.getElementById('csv-file-input').click()">
+                            <div class="upload-icon">📁</div>
+                            <h3>Arraste o arquivo CSV aqui</h3>
+                            <p>ou clique para selecionar — Aceita arquivos .csv exportados do Google Planilhas</p>
+                        </div>
+                        <input type="file" id="csv-file-input" accept=".csv,.txt" style="display:none" onchange="Pages.dataImport.handleFile(event)">
+                    </div>
+
+                    <div id="paste-source-area" style="display:none">
+                        <div class="form-group"><label class="form-label">Placa do Caminhão *</label>
+                            <select class="form-control" id="paste-placa" style="max-width:220px"></select>
+                        </div>
+                        <div class="form-group"><label class="form-label">Cole aqui os dados (selecione as células na planilha, Ctrl+C, depois Ctrl+V aqui)</label>
+                            <textarea class="form-control" id="paste-textarea" rows="10" style="font-family:monospace;font-size:0.85rem" placeholder="Cole aqui (Ctrl+V)..."></textarea>
+                        </div>
+                        <button class="btn btn-primary" onclick="Pages.dataImport.processPaste()">🔎 Processar Dados Colados</button>
+                    </div>
                 </div></div>
                 <div id="import-preview" class="mt-3"></div>
             </div>`;
@@ -497,13 +518,206 @@ Pages.dataImport = {
     onTypeChange() {
         const type = document.getElementById('import-type').value;
         const help = document.getElementById('import-type-help');
+        const isFrota = type === 'fuelings-frota' || type === 'freights-frota';
+        document.getElementById('import-source-toggle').style.display = isFrota ? 'block' : 'none';
+        document.getElementById('import-preview').innerHTML = '';
+        if (!isFrota) this.setSourceMode('upload');
+        else this.setSourceMode(this.sourceMode);
         if (type === 'fuelings-frota') {
-            help.innerHTML = '💡 <strong>Formato:</strong> O nome do arquivo deve conter a placa (ex: <code>JCU7I43 - ABASTECIDAS.csv</code>). Datas podem ser dd/mm (sem ano). Colunas: B=Mês, C=Data, D=KM, E=Posto, F=Litros, G=Valor Diesel, H=Valor Arla.';
+            help.innerHTML = '💡 <strong>Formato:</strong> Ao subir CSV, o nome do arquivo deve conter a placa. Ao colar, escolha a placa na lista. Datas podem ser dd/mm (sem ano). Colunas: Mês, Data, KM, Posto, Litros, Valor Diesel, Valor Arla.';
         } else if (type === 'freights-frota') {
-            help.innerHTML = '💡 <strong>Formato:</strong> O nome do arquivo deve conter a placa. Colunas: B=Tipo (1=Carregado, 0=Vazio), C=Cidades (Origem - Destino), F=KM, G=Data, I=Comissão.';
+            help.innerHTML = '💡 <strong>Formato:</strong> Ao subir CSV, o nome do arquivo deve conter a placa. Ao colar, escolha a placa na lista. Colunas: Tipo (1=Carregado, 0=Vazio), Cidades (Origem - Destino), KM, Data.';
         } else {
             help.innerHTML = '💡 CSV genérico com cabeçalho na primeira linha. Você mapeará as colunas após o upload.';
         }
+    },
+    async setSourceMode(mode) {
+        this.sourceMode = mode;
+        const type = document.getElementById('import-type')?.value;
+        const isFrota = type === 'fuelings-frota' || type === 'freights-frota';
+        document.getElementById('csv-source-area').style.display = (isFrota && mode === 'paste') ? 'none' : 'block';
+        document.getElementById('paste-source-area').style.display = (isFrota && mode === 'paste') ? 'block' : 'none';
+        const upBtn = document.getElementById('source-btn-upload');
+        const pasteBtn = document.getElementById('source-btn-paste');
+        if (upBtn && pasteBtn) {
+            upBtn.className = 'btn btn-sm ' + (mode === 'upload' ? 'btn-primary' : 'btn-secondary');
+            pasteBtn.className = 'btn btn-sm ' + (mode === 'paste' ? 'btn-primary' : 'btn-secondary');
+        }
+        if (isFrota && mode === 'paste') await this.loadTruckSelect();
+    },
+    async loadTruckSelect() {
+        const sel = document.getElementById('paste-placa');
+        if (!sel) return;
+        const trucks = (await db.getAll('trucks')).sort((a, b) => (a.placa || '').localeCompare(b.placa || ''));
+        sel.innerHTML = '<option value="">— Selecione —</option>' + trucks.map(t => `<option value="${t.placa}">${t.placa}</option>`).join('');
+    },
+    processPaste() {
+        const type = document.getElementById('import-type').value;
+        const placa = document.getElementById('paste-placa').value.trim().toUpperCase();
+        const text = document.getElementById('paste-textarea').value;
+        if (!placa) { Utils.showToast('Selecione a placa do caminhão', 'warning'); return; }
+        if (!text.trim()) { Utils.showToast('Cole os dados da planilha na área de texto', 'warning'); return; }
+
+        if (type === 'fuelings-frota') {
+            const rows = this.parsePastedFuelingText(text, placa);
+            if (rows.length === 0) { Utils.showToast('Nenhum abastecimento reconhecido no texto colado', 'error'); return; }
+            this.renderFuelingPreview(placa, rows);
+        } else if (type === 'freights-frota') {
+            const rows = this.parsePastedFreightText(text, placa);
+            if (rows.length === 0) { Utils.showToast('Nenhum frete reconhecido no texto colado', 'error'); return; }
+            this.renderFreightPreview(placa, rows);
+        }
+    },
+    // ===== PASTE PARSERS (tab-separated, heuristic column detection) =====
+    parsePasteLine(line) {
+        // Excel/Sheets paste is tab-separated; handle quoted cells just in case
+        const cells = [];
+        let current = '', inQuotes = false;
+        for (let j = 0; j < line.length; j++) {
+            const c = line[j];
+            if (c === '"') { if (inQuotes && line[j + 1] === '"') { current += '"'; j++; } else { inQuotes = !inQuotes; } }
+            else if (c === '\t' && !inQuotes) { cells.push(current); current = ''; }
+            else { current += c; }
+        }
+        cells.push(current);
+        return cells;
+    },
+    parsePastedFreightText(text, placa) {
+        const lines = text.split(/\r?\n/);
+        const rows = [];
+        for (const line of lines) {
+            if (!line || !line.trim()) continue;
+            const cells = this.parsePasteLine(line);
+            const parsed = this.parsePastedFreightRow(cells);
+            if (parsed) rows.push({ ...parsed, placa });
+        }
+        return rows;
+    },
+    parsePastedFreightRow(cells) {
+        const isFiller = c => { const t = (c || '').trim().toUpperCase(); return t === '' || t === 'X' || t === '-'; };
+
+        const tipoIdx = cells.findIndex(c => c.trim() === '0' || c.trim() === '1');
+        if (tipoIdx === -1) return null;
+        const tipoRaw = cells[tipoIdx].trim();
+
+        let cidadesIdx = -1;
+        for (let i = tipoIdx + 1; i < cells.length; i++) {
+            const c = cells[i].trim();
+            if (isFiller(c)) continue;
+            if (/[a-zA-Zà-úÀ-Ú]/.test(c)) cidadesIdx = i;
+            break;
+        }
+        if (cidadesIdx === -1) return null;
+        const cidadesRaw = cells[cidadesIdx].trim();
+
+        let kmIdx = -1;
+        for (let i = cidadesIdx + 1; i < cells.length; i++) {
+            const c = cells[i].trim();
+            if (isFiller(c)) continue;
+            if (/^\d{1,6}$/.test(c)) kmIdx = i;
+            break;
+        }
+
+        let dataIdx = -1;
+        let from = (kmIdx > -1 ? kmIdx : cidadesIdx) + 1;
+        for (let i = from; i < cells.length; i++) {
+            const c = cells[i].trim();
+            if (isFiller(c)) continue;
+            if (/^\d{1,2}\/\d{1,2}(\/\d{2,4})?$/.test(c)) dataIdx = i;
+            break;
+        }
+        if (dataIdx === -1) return null;
+        const dataRaw = cells[dataIdx].trim();
+
+        let origem = '', destino = '';
+        const separators = [' - ', ' – ', ' — ', ' x ', ' X '];
+        let found = false;
+        for (const sep of separators) {
+            const idx = cidadesRaw.indexOf(sep);
+            if (idx > 0) { origem = cidadesRaw.substring(0, idx).trim(); destino = cidadesRaw.substring(idx + sep.length).trim(); found = true; break; }
+        }
+        if (!found) { origem = cidadesRaw; destino = ''; }
+
+        const tipo = tipoRaw === '1' ? 'carregado' : tipoRaw === '0' ? 'vazio' : tipoRaw;
+        return { tipo, tipoRaw, origem, destino, cidadesRaw, kmRaw: kmIdx > -1 ? cells[kmIdx].trim() : '', dataRaw };
+    },
+    parsePastedFuelingText(text, placa) {
+        const lines = text.split(/\r?\n/);
+        const rows = [];
+        for (const line of lines) {
+            if (!line || !line.trim()) continue;
+            const cells = this.parsePasteLine(line);
+            const parsed = this.parsePastedFuelingRow(cells);
+            if (parsed) rows.push({ ...parsed, placa });
+        }
+        return rows;
+    },
+    parsePastedFuelingRow(cells) {
+        const isFiller = c => { const t = (c || '').trim().toUpperCase(); return t === '' || t === 'X' || t === '-'; };
+
+        let dataIdx = -1;
+        for (let i = 0; i < cells.length; i++) {
+            if (/^\d{1,2}\/\d{1,2}(\/\d{2,4})?$/.test(cells[i].trim())) { dataIdx = i; break; }
+        }
+        if (dataIdx === -1) return null;
+        const dataRaw = cells[dataIdx].trim();
+        const mes = cells.slice(0, dataIdx).map(c => c.trim()).filter(c => c && !isFiller(c)).join(' ');
+
+        let from = dataIdx + 1;
+        let kmIdx = -1;
+        for (let i = from; i < cells.length; i++) {
+            const c = cells[i].trim();
+            if (isFiller(c)) continue;
+            if (/^\d{1,7}$/.test(c)) kmIdx = i;
+            break;
+        }
+
+        from = (kmIdx > -1 ? kmIdx : dataIdx) + 1;
+        let postoIdx = -1;
+        for (let i = from; i < cells.length; i++) {
+            const c = cells[i].trim();
+            if (isFiller(c)) continue;
+            if (/[a-zA-Zà-úÀ-Ú]/.test(c)) postoIdx = i;
+            break;
+        }
+
+        from = (postoIdx > -1 ? postoIdx : from) + 1;
+        let litrosIdx = -1;
+        for (let i = from; i < cells.length; i++) {
+            const c = cells[i].trim();
+            if (isFiller(c)) continue;
+            if (/^\d+([.,]\d+)?$/.test(c)) litrosIdx = i;
+            break;
+        }
+
+        from = (litrosIdx > -1 ? litrosIdx : from) + 1;
+        let valorDieselIdx = -1;
+        for (let i = from; i < cells.length; i++) {
+            const c = cells[i].trim();
+            if (isFiller(c)) continue;
+            if (/R\$/.test(c) || /^\d+[.,]\d{2}$/.test(c)) valorDieselIdx = i;
+            break;
+        }
+
+        from = (valorDieselIdx > -1 ? valorDieselIdx : from) + 1;
+        let valorArlaIdx = -1;
+        for (let i = from; i < cells.length; i++) {
+            const c = cells[i].trim();
+            if (isFiller(c)) continue;
+            if (/R\$/.test(c) || /^\d+[.,]\d{2}$/.test(c)) valorArlaIdx = i;
+            break;
+        }
+
+        if (litrosIdx === -1) return null;
+
+        return {
+            mes, dataRaw,
+            kmRaw: kmIdx > -1 ? cells[kmIdx].trim() : '',
+            posto: postoIdx > -1 ? cells[postoIdx].trim() : '',
+            litrosRaw: cells[litrosIdx].trim(),
+            valorDieselRaw: valorDieselIdx > -1 ? cells[valorDieselIdx].trim() : '',
+            valorArlaRaw: valorArlaIdx > -1 ? cells[valorArlaIdx].trim() : ''
+        };
     },
     setupDragDrop() {
         const area = document.getElementById('csv-drop-area');
@@ -575,14 +789,17 @@ Pages.dataImport = {
     processFleetFile() {
         const { placa, rows } = this.parseFleetCSV(this.rawText, this.fileName);
         if (rows.length === 0) { Utils.showToast('Nenhum dado encontrado no arquivo', 'error'); return; }
+        this.renderFuelingPreview(placa, rows);
+    },
 
-        // Detect years from dates that have full format (dd/mm/yyyy) or infer
+    renderFuelingPreview(placa, rows) {
+        this.lastFuelingRows = rows;
         const currentYear = new Date().getFullYear();
 
         document.getElementById('import-preview').innerHTML = `
             <div class="card"><div class="card-header"><h3>Preview — ${rows.length} linhas encontradas</h3></div><div class="card-body">
                 <div class="form-row mb-2">
-                    <div class="form-group"><label class="form-label">Placa (detectada)</label><input type="text" class="form-control" id="fleet-placa" value="${placa}" placeholder="Ex: JCU7I43" style="max-width:150px;font-weight:700;text-transform:uppercase"></div>
+                    <div class="form-group"><label class="form-label">Placa</label><input type="text" class="form-control" id="fleet-placa" value="${placa}" placeholder="Ex: JCU7I43" style="max-width:150px;font-weight:700;text-transform:uppercase"></div>
                     <div class="form-group"><label class="form-label">Ano base das datas *</label><input type="number" class="form-control" id="fleet-ano" value="${currentYear}" style="max-width:100px" placeholder="2025">
                     <small class="text-muted">Para datas dd/mm sem ano</small></div>
                 </div>
@@ -608,7 +825,7 @@ Pages.dataImport = {
             truck = await db.getTruckByPlaca(placa);
         }
 
-        const { rows } = this.parseFleetCSV(this.rawText, this.fileName);
+        const rows = this.lastFuelingRows || [];
         const items = [];
         let errors = [];
 
@@ -710,13 +927,17 @@ Pages.dataImport = {
     processFleetFreightFile() {
         const { placa, rows } = this.parseFleetFreightCSV(this.rawText, this.fileName);
         if (rows.length === 0) { Utils.showToast('Nenhum frete encontrado no arquivo', 'error'); return; }
+        this.renderFreightPreview(placa, rows);
+    },
 
+    renderFreightPreview(placa, rows) {
+        this.lastFreightRows = rows;
         const currentYear = new Date().getFullYear();
 
         document.getElementById('import-preview').innerHTML = `
             <div class="card"><div class="card-header"><h3>Preview — ${rows.length} fretes encontrados</h3></div><div class="card-body">
                 <div class="form-row mb-2">
-                    <div class="form-group"><label class="form-label">Placa (detectada)</label><input type="text" class="form-control" id="fleet-placa" value="${placa}" placeholder="Ex: JCU7I43" style="max-width:150px;font-weight:700;text-transform:uppercase"></div>
+                    <div class="form-group"><label class="form-label">Placa</label><input type="text" class="form-control" id="fleet-placa" value="${placa}" placeholder="Ex: JCU7I43" style="max-width:150px;font-weight:700;text-transform:uppercase"></div>
                     <div class="form-group"><label class="form-label">Ano base das datas *</label><input type="number" class="form-control" id="fleet-ano" value="${currentYear}" style="max-width:100px" placeholder="2025">
                     <small class="text-muted">Para datas dd/mm sem ano</small></div>
                 </div>
@@ -798,7 +1019,7 @@ Pages.dataImport = {
             if (valorFixo <= 0) { Utils.showToast('Informe o valor fixo do frete', 'warning'); return; }
         }
 
-        const { rows } = this.parseFleetFreightCSV(this.rawText, this.fileName);
+        const rows = this.lastFreightRows || [];
         const items = [];
         let errors = [];
 
