@@ -668,7 +668,7 @@ Pages.dataImport = {
         for (let i = from; i < cells.length; i++) {
             const c = cells[i].trim();
             if (isFiller(c)) continue;
-            if (/^\d{1,7}$/.test(c)) kmIdx = i;
+            if (/^\d{1,7}(\s*KM)?$/i.test(c)) kmIdx = i;
             break;
         }
 
@@ -686,7 +686,7 @@ Pages.dataImport = {
         for (let i = from; i < cells.length; i++) {
             const c = cells[i].trim();
             if (isFiller(c)) continue;
-            if (/^\d+([.,]\d+)?$/.test(c)) litrosIdx = i;
+            if (/^\d+([.,]\d+)?(\s*L)?$/i.test(c)) litrosIdx = i;
             break;
         }
 
