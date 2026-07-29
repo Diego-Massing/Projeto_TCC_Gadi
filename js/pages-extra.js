@@ -863,7 +863,9 @@ Pages.dataImport = {
         if (!confirm(`Importar ${items.length} abastecimentos para ${placa}? ${errors.length ? errors.length + ' linhas com erro serão ignoradas.' : ''}`)) return;
 
         const result = await db.bulkAdd('fuelings', items);
-        Utils.showToast(`✅ Importados ${result.added} abastecimentos para ${placa}!${errors.length ? ' ' + errors.length + ' ignorados.' : ''}`, result.added > 0 ? 'success' : 'warning');
+        if (result.errors.length) console.error('Erro ao importar abastecimentos:', result.errors);
+        const dbErrorMsg = result.errors.length ? ` Erro: ${result.errors[0].message || result.errors[0]}` : '';
+        Utils.showToast(`✅ Importados ${result.added} abastecimentos para ${placa}!${errors.length ? ' ' + errors.length + ' ignorados.' : ''}${dbErrorMsg}`, result.added > 0 ? 'success' : 'error');
         if (errors.length) console.warn('Import errors:', errors);
     },
 
@@ -1043,6 +1045,7 @@ Pages.dataImport = {
                 const item = {
                     truckId: truck.id,
                     data,
+                    cliente: '',
                     origem: r.origem,
                     destino: r.destino,
                     km,
@@ -1064,7 +1067,9 @@ Pages.dataImport = {
         if (!confirm(`Importar ${items.length} fretes para ${placa}?\nModalidade: ${modalidade === 'kmPlaca' ? 'Taxa KM' : 'Frete Fechado'}\nValor total estimado: ${Utils.formatCurrency(totalValor)}\n${errors.length ? errors.length + ' linhas ignoradas.' : ''}`)) return;
 
         const result = await db.bulkAdd('freights', items);
-        Utils.showToast(`✅ Importados ${result.added} fretes para ${placa}!${errors.length ? ' ' + errors.length + ' ignorados.' : ''}`, result.added > 0 ? 'success' : 'warning');
+        if (result.errors.length) console.error('Erro ao importar fretes:', result.errors);
+        const dbErrorMsg = result.errors.length ? ` Erro: ${result.errors[0].message || result.errors[0]}` : '';
+        Utils.showToast(`✅ Importados ${result.added} fretes para ${placa}!${errors.length ? ' ' + errors.length + ' ignorados.' : ''}${dbErrorMsg}`, result.added > 0 ? 'success' : 'error');
         if (errors.length) console.warn('Import errors:', errors);
     },
 
