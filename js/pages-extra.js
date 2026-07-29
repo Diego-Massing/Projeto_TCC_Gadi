@@ -849,8 +849,7 @@ Pages.dataImport = {
                     valorLitro,
                     valorTotal,
                     valorArla,
-                    tipoComb: valorArla > 0 ? 'Diesel+Arla' : 'Diesel',
-                    obs: r.mes
+                    tipoComb: valorArla > 0 ? 'Diesel+Arla' : 'Diesel'
                 };
                 items.push(item);
             } catch (e) {
