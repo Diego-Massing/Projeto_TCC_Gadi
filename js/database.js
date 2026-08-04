@@ -627,9 +627,13 @@ class FrotaDatabase {
 
         let freights = [], fuelings = [], fuelingsForMedia = [];
         if (truck) {
+            // Fretes da placa que NÃO estão marcados pra outro motorista (sem userId, ou
+            // marcados pra este mesmo motorista) + os marcados direto pra ele em qualquer placa.
+            // Um frete com userId de outro motorista sai da conta de quem só bate por placa —
+            // senão troca de motorista no meio do mês pagaria comissão em duplicidade.
             const truckFreights = await this.getDataByTruckAndDateRange('freights', truck.id, dataInicio, dataFim);
             const byId = new Map();
-            truckFreights.forEach(f => byId.set(f.id, f));
+            truckFreights.filter(f => !f.userId || f.userId === userId).forEach(f => byId.set(f.id, f));
             driverTaggedFreights.forEach(f => byId.set(f.id, f));
             freights = [...byId.values()];
         } else {
