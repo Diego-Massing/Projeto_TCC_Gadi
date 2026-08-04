@@ -602,7 +602,21 @@ class FrotaDatabase {
 
         const truck = user.truckId ? await this.getById('trucks', user.truckId) : null;
         const commConfig = await this.getCommissionConfig();
-        const rates = truck ? await this.getKmRatesForTruck(truck.id) : await this.getKmRates();
+
+        // Fretes marcados diretamente pro motorista (independe da placa cadastrada nele) —
+        // cobre troca de motorista no meio do mês e motorista sem placa fixa.
+        const driverTaggedFreights = await this.getDataByUserAndDateRange('freights', userId, dataInicio, dataFim);
+
+        // Sem placa fixa: se os fretes marcados pra ele vierem de uma única placa, usa ela
+        // pra taxa/abastecimento/média. Se vierem de mais de uma, não dá pra inferir (fica sem
+        // média — motorista reserva/troca no meio do mês, tratado manualmente via bônus).
+        let inferredTruck = null;
+        if (!truck) {
+            const distinctTruckIds = [...new Set(driverTaggedFreights.map(f => f.truckId).filter(Boolean))];
+            if (distinctTruckIds.length === 1) inferredTruck = await this.getById('trucks', distinctTruckIds[0]);
+        }
+        const rateTruck = truck || inferredTruck;
+        const rates = rateTruck ? await this.getKmRatesForTruck(rateTruck.id) : await this.getKmRates();
 
         // Calculate days in period and proportional salary
         const start = new Date(dataInicio + 'T00:00:00');
@@ -613,15 +627,23 @@ class FrotaDatabase {
 
         let freights = [], fuelings = [], fuelingsForMedia = [];
         if (truck) {
-            freights = await this.getDataByTruckAndDateRange('freights', truck.id, dataInicio, dataFim);
-            fuelings = await this.getDataByTruckAndDateRange('fuelings', truck.id, dataInicio, dataFim);
+            const truckFreights = await this.getDataByTruckAndDateRange('freights', truck.id, dataInicio, dataFim);
+            const byId = new Map();
+            truckFreights.forEach(f => byId.set(f.id, f));
+            driverTaggedFreights.forEach(f => byId.set(f.id, f));
+            freights = [...byId.values()];
+        } else {
+            freights = driverTaggedFreights;
+        }
+        if (rateTruck) {
+            fuelings = await this.getDataByTruckAndDateRange('fuelings', rateTruck.id, dataInicio, dataFim);
             // For media calculation, also include previous month fuelings
             const startDate = new Date(dataInicio + 'T00:00:00');
             const prevMonthStart = new Date(startDate.getFullYear(), startDate.getMonth() - 1, 1);
             const prevMonthEnd = new Date(startDate.getFullYear(), startDate.getMonth(), 0);
             const prevDataInicio = prevMonthStart.toISOString().split('T')[0];
             const prevDataFim = prevMonthEnd.toISOString().split('T')[0];
-            const prevFuelings = await this.getDataByTruckAndDateRange('fuelings', truck.id, prevDataInicio, prevDataFim);
+            const prevFuelings = await this.getDataByTruckAndDateRange('fuelings', rateTruck.id, prevDataInicio, prevDataFim);
             fuelingsForMedia = [...prevFuelings.map(f => ({ ...f, _prevMonth: true })), ...fuelings];
         }
 
@@ -684,7 +706,7 @@ class FrotaDatabase {
 
         return {
             userId, userName: user.nome, userRole: user.role,
-            truckId: truck?.id || null, placa: truck?.placa || '—',
+            truckId: rateTruck?.id || null, placa: rateTruck?.placa || '—',
             dataInicio, dataFim,
             salarioFixo, salarioFixoBase, diasTrabalhados, diasNoMes,
             kmCarregado, kmVazio, totalKmCarregado, totalKmVazio, valorKmCarregado, valorKmVazio,

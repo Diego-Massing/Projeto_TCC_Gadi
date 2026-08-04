@@ -205,6 +205,7 @@ Pages.freights = {
     async render() {
         const trucks = await db.getAll('trucks');
         const freights = await db.getAll('freights');
+        const drivers = (await db.getAll('users')).filter(u => u.role === 'motorista');
         const rates = await db.getKmRates();
         freights.sort((a, b) => b.data?.localeCompare(a.data));
         const { mes, ano } = Utils.getCurrentMonth();
@@ -222,6 +223,7 @@ Pages.freights = {
         const addBtn = isViewer ? '' : `<button class="btn btn-primary" onclick="Pages.freights.showForm()">＋ Novo Frete</button>`;
         const exportBtn = isDriver ? '' : `<button class="btn btn-secondary btn-sm" onclick="Pages.freights.exportCSV()">📥 Exportar</button>`;
         const truckFilter = isDriver ? '' : `<div class="form-group"><label class="form-label">Placa</label><select class="form-control" id="filter-fr-truck" onchange="Pages.freights.applyFilter()"><option value="">Todas</option>${trucks.map(t => `<option value="${t.id}">${t.placa}</option>`).join('')}</select></div>`;
+        const driverFilter = isDriver ? '' : `<div class="form-group"><label class="form-label">Motorista</label><select class="form-control" id="filter-fr-driver" onchange="Pages.freights.applyFilter()"><option value="">Todos</option>${drivers.map(d => `<option value="${d.id}">${d.nome}</option>`).join('')}</select></div>`;
 
         document.getElementById('page-content').innerHTML = `
             <div class="page-header"><div class="page-header-row">
@@ -240,6 +242,7 @@ Pages.freights = {
                         </div>
                     </div>
                     ${truckFilter}
+                    ${driverFilter}
                     <div class="form-group"><label class="form-label">Tipo</label><select class="form-control" id="filter-fr-tipo" onchange="Pages.freights.applyFilter()"><option value="">Todos</option><option value="carregado">Carregado</option><option value="vazio">Vazio</option></select></div>
                 </div>
                 <!-- Advanced Date Filter (Collapsed by default) -->
@@ -253,11 +256,11 @@ Pages.freights = {
             // Initial render filter by current month
             const d = new Date(f.data);
             return d.getMonth() + 1 === mes && d.getFullYear() === ano;
-        }), trucks)}</div>
+        }), trucks, drivers)}</div>
             </div>`;
     },
 
-    renderTable(freights, trucks) {
+    renderTable(freights, trucks, drivers) {
         if (freights.length === 0) return '<div class="empty-state"><div class="empty-icon">📦</div><h3>Nenhum frete encontrado</h3></div>';
         const total = freights.reduce((s, f) => s + ((f.valorFrete || 0) - (f.desconto || 0)), 0);
         const totalKm = freights.reduce((s, f) => s + (f.km || 0), 0);
@@ -270,12 +273,15 @@ Pages.freights = {
                     <button class="btn btn-sm" style="background:#fff;color:var(--accent-danger);font-weight:700" onclick="Pages.freights.deleteSelected()">🗑️ Excluir Selecionados</button>
                 </div>
             </div>
-            <div class="table-container"><table class="data-table"><thead><tr><th style="width:36px"><input type="checkbox" id="select-all-freights" onchange="Pages.freights.toggleAllFreights(this.checked)" title="Selecionar todos"></th><th>Placa</th><th>Data</th><th>Origem</th><th>Destino</th><th>KM</th><th>Tipo</th><th>Modalidade</th><th>R$/KM</th><th>Valor Frete</th><th>Recebimento</th><th>Cliente</th><th></th></tr></thead><tbody>${freights.map(f => {
+            <div class="table-container"><table class="data-table"><thead><tr><th style="width:36px"><input type="checkbox" id="select-all-freights" onchange="Pages.freights.toggleAllFreights(this.checked)" title="Selecionar todos"></th><th>Placa</th><th>Motorista</th><th>Data</th><th>Origem</th><th>Destino</th><th>KM</th><th>Tipo</th><th>Modalidade</th><th>R$/KM</th><th>Valor Frete</th><th>Recebimento</th><th>Cliente</th><th></th></tr></thead><tbody>${freights.map(f => {
             const t = trucks.find(tt => tt.id === f.truckId);
+            const drv = (drivers || []).find(d => d.id === f.userId);
             const mod = f.modalidade || 'kmSistema';
             return `<tr>
                 <td><input type="checkbox" class="freight-checkbox" value="${f.id}" onchange="Pages.freights.updateBulkBar()"></td>
-                <td class="font-mono font-bold">${t?.placa || '—'}${f.isMiro ? ' <span style="font-size:0.58rem;background:var(--accent-info);color:#fff;padding:1px 4px;border-radius:3px;vertical-align:middle">MIRO</span>' : ''}</td><td>${Utils.formatDate(f.data)}</td><td>${f.origem || '—'}</td><td>${f.destino || '—'}</td>
+                <td class="font-mono font-bold">${t?.placa || '—'}${f.isMiro ? ' <span style="font-size:0.58rem;background:var(--accent-info);color:#fff;padding:1px 4px;border-radius:3px;vertical-align:middle">MIRO</span>' : ''}</td>
+                <td>${drv ? drv.nome : '<span class="text-muted">—</span>'}</td>
+                <td>${Utils.formatDate(f.data)}</td><td>${f.origem || '—'}</td><td>${f.destino || '—'}</td>
                 <td>${Utils.formatNumber(f.km)}</td><td><span class="badge ${f.tipo === 'carregado' ? 'badge-success' : 'badge-warning'}">${f.tipo || '—'}</span></td>
                 <td><span class="badge ${modalColors[mod] || 'badge-info'}" style="font-size:0.68rem">${modalLabels[mod] || mod}</span></td>
                 <td>${mod === 'fechado' ? `<span class="text-muted" style="font-size:0.75rem">${Utils.formatCurrency(f.taxaKmEfetiva || f.taxaKm)}</span>` : Utils.formatCurrency(f.taxaKm)}</td>
@@ -326,12 +332,15 @@ Pages.freights = {
     async applyFilter(useDateRange = false) {
         let freights = await db.getAll('freights');
         const trucks = await db.getAll('trucks');
+        const drivers = (await db.getAll('users')).filter(u => u.role === 'motorista');
         // Driver: always filter by their truck
         if (App.userRole === 'motorista' && App.userTruckId) {
             freights = freights.filter(f => f.truckId === App.userTruckId);
         } else {
             const tid = document.getElementById('filter-fr-truck')?.value;
             if (tid) freights = freights.filter(f => f.truckId === parseInt(tid));
+            const did = document.getElementById('filter-fr-driver')?.value;
+            if (did) freights = freights.filter(f => f.userId === parseInt(did));
         }
         const tipo = document.getElementById('filter-fr-tipo')?.value;
 
@@ -362,20 +371,37 @@ Pages.freights = {
         if (tipo) freights = freights.filter(f => f.tipo === tipo);
 
         freights.sort((a, b) => b.data?.localeCompare(a.data));
-        document.getElementById('freights-table').innerHTML = this.renderTable(freights, trucks);
+        document.getElementById('freights-table').innerHTML = this.renderTable(freights, trucks, drivers);
     },
 
     async showForm(id, presetTruckId) {
+        this._driverTouched = false;
         const trucks = await db.getAll('trucks');
+        const drivers = (await db.getAll('users')).filter(u => u.role === 'motorista');
         let item = null;
         if (id) item = await db.getById('freights', id);
         const currentMod = item?.modalidade || 'kmPlaca';
+
+        const isDriverRole = App.userRole === 'motorista';
+        let suggestedDriverId = item?.userId ?? null;
+        if (!item) {
+            const tId = presetTruckId || (isDriverRole ? App.userTruckId : null);
+            if (tId) {
+                const drv = await db.getDriverForTruck(tId);
+                if (drv) suggestedDriverId = drv.id;
+            }
+        }
+        const driverValue = isDriverRole ? App.userAppId : suggestedDriverId;
+
         const modal = document.getElementById('modal-overlay');
         modal.querySelector('.modal-header h2').textContent = id ? 'Editar Frete' : 'Novo Frete';
         modal.querySelector('.modal-body').innerHTML = `
             <div class="form-row">
                 <div class="form-group"><label class="form-label">Caminhão *</label><select class="form-control" id="f-truckId" onchange="Pages.freights.onTruckChange()" ${App.userRole === 'motorista' ? 'disabled' : ''}><option value="">Selecione</option>${trucks.map(t => `<option value="${t.id}" ${(item?.truckId === t.id || presetTruckId === t.id || (App.userRole === 'motorista' && App.userTruckId === t.id)) ? 'selected' : ''}>${t.placa}${t.kmCarregado != null ? ' 💰' : ''}</option>`).join('')}</select></div>
                 <div class="form-group"><label class="form-label">Data *</label><input type="date" class="form-control" id="f-data" value="${item?.data || new Date().toISOString().split('T')[0]}"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label class="form-label">Motorista</label><select class="form-control" id="f-userId" onchange="Pages.freights._driverTouched = true" ${isDriverRole ? 'disabled' : ''}><option value="">— Nenhum específico —</option>${drivers.map(d => `<option value="${d.id}" ${driverValue === d.id ? 'selected' : ''}>${d.nome}</option>`).join('')}</select></div>
             </div>
             <div class="form-row">
                 <div class="form-group"><label class="form-label">Cidade Origem *</label><input type="text" class="form-control" id="f-origem" value="${item?.origem || ''}" placeholder="Ex: São Paulo"></div>
@@ -483,6 +509,14 @@ Pages.freights = {
         const modalidade = document.getElementById('f-modalidade')?.value;
         if (modalidade === 'kmPlaca') {
             this.calcFrete();
+        }
+        if (!this._driverTouched) {
+            const truckId = parseInt(document.getElementById('f-truckId')?.value);
+            const driverSel = document.getElementById('f-userId');
+            if (driverSel) {
+                const drv = truckId ? await db.getDriverForTruck(truckId) : null;
+                driverSel.value = drv ? drv.id : '';
+            }
         }
     },
 
@@ -635,6 +669,7 @@ Pages.freights = {
 
         const data = {
             truckId,
+            userId: parseInt(document.getElementById('f-userId')?.value) || null,
             data: document.getElementById('f-data').value,
             origem: document.getElementById('f-origem').value.trim(),
             destino: document.getElementById('f-destino').value.trim(),

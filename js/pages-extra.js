@@ -931,9 +931,13 @@ Pages.dataImport = {
         this.renderFreightPreview(placa, rows);
     },
 
-    renderFreightPreview(placa, rows) {
+    async renderFreightPreview(placa, rows) {
         this.lastFreightRows = rows;
         const currentYear = new Date().getFullYear();
+
+        const drivers = (await db.getAll('users')).filter(u => u.role === 'motorista');
+        const truck = placa ? await db.getTruckByPlaca(placa) : null;
+        const suggestedDriver = truck ? await db.getDriverForTruck(truck.id) : null;
 
         document.getElementById('import-preview').innerHTML = `
             <div class="card"><div class="card-header"><h3>Preview — ${rows.length} fretes encontrados</h3></div><div class="card-body">
@@ -941,6 +945,7 @@ Pages.dataImport = {
                     <div class="form-group"><label class="form-label">Placa</label><input type="text" class="form-control" id="fleet-placa" value="${placa}" placeholder="Ex: JCU7I43" style="max-width:150px;font-weight:700;text-transform:uppercase"></div>
                     <div class="form-group"><label class="form-label">Ano base das datas *</label><input type="number" class="form-control" id="fleet-ano" value="${currentYear}" style="max-width:100px" placeholder="2025">
                     <small class="text-muted">Para datas dd/mm sem ano</small></div>
+                    <div class="form-group"><label class="form-label">Motorista</label><select class="form-control" id="fleet-userId" style="max-width:220px"><option value="">— Nenhum específico —</option>${drivers.map(d => `<option value="${d.id}" ${suggestedDriver?.id === d.id ? 'selected' : ''}>${d.nome}</option>`).join('')}</select></div>
                 </div>
                 <div class="card mb-3" style="background:var(--bg-primary);border:2px solid var(--accent-primary)">
                     <div class="card-body">
@@ -997,6 +1002,7 @@ Pages.dataImport = {
         const placa = document.getElementById('fleet-placa').value.trim().toUpperCase();
         const anoBase = parseInt(document.getElementById('fleet-ano').value) || new Date().getFullYear();
         const modalidade = document.getElementById('fleet-modalidade').value;
+        const userId = parseInt(document.getElementById('fleet-userId')?.value) || null;
 
         if (!placa) { Utils.showToast('Informe a placa do caminhão', 'warning'); return; }
 
@@ -1043,6 +1049,7 @@ Pages.dataImport = {
 
                 const item = {
                     truckId: truck.id,
+                    userId,
                     data,
                     cliente: '',
                     origem: r.origem,
@@ -1073,18 +1080,23 @@ Pages.dataImport = {
     },
 
     // ===== GENERIC CSV IMPORT (existing) =====
-    processGenericFile() {
+    async processGenericFile() {
         this.csvData = Utils.parseCSV(this.rawText);
         if (this.csvData.rows.length === 0) { Utils.showToast('Arquivo vazio ou inválido', 'error'); return; }
         const type = document.getElementById('import-type').value;
         const fieldMap = this.getFieldMap(type);
+        let driverPickerHtml = '';
+        if (type === 'freights') {
+            const drivers = (await db.getAll('users')).filter(u => u.role === 'motorista');
+            driverPickerHtml = `<div class="form-group"><label class="form-label">Motorista (aplica a todas as linhas)</label><select class="form-control" id="map-userId" style="max-width:220px"><option value="">— Nenhum específico —</option>${drivers.map(d => `<option value="${d.id}">${d.nome}</option>`).join('')}</select></div>`;
+        }
         document.getElementById('import-preview').innerHTML = `
             <div class="card"><div class="card-header"><h3>Preview — ${this.csvData.rows.length} linhas encontradas</h3></div><div class="card-body">
                 <p class="text-muted mb-2">Mapeie as colunas do CSV para os campos do sistema:</p>
                 <div class="form-row">${fieldMap.map(f => `<div class="form-group">
                     <label class="form-label">${f.label}</label>
                     <select class="form-control" id="map-${f.key}"><option value="">— Ignorar —</option>${this.csvData.headers.map(h => `<option value="${h}" ${h.toLowerCase().includes(f.hint) ? 'selected' : ''}>${h}</option>`).join('')}</select>
-                </div>`).join('')}</div>
+                </div>`).join('')}${driverPickerHtml}</div>
                 <div class="table-container mt-2" style="max-height:300px;overflow-y:auto"><table class="data-table"><thead><tr>${this.csvData.headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${this.csvData.rows.slice(0, 10).map(r => `<tr>${this.csvData.headers.map(h => `<td>${r[h] || ''}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
                 ${this.csvData.rows.length > 10 ? `<p class="text-muted mt-1">Mostrando 10 de ${this.csvData.rows.length} linhas</p>` : ''}
                 <button class="btn btn-primary btn-lg mt-3" onclick="Pages.dataImport.executeImport()">📥 Importar ${this.csvData.rows.length} Registros</button>
@@ -1104,6 +1116,7 @@ Pages.dataImport = {
         const fieldMap = this.getFieldMap(type);
         const mapping = {};
         fieldMap.forEach(f => { const sel = document.getElementById('map-' + f.key); if (sel) mapping[f.key] = sel.value; });
+        const driverId = type === 'freights' ? (parseInt(document.getElementById('map-userId')?.value) || null) : null;
 
         const items = [];
         for (const row of this.csvData.rows) {
@@ -1124,6 +1137,7 @@ Pages.dataImport = {
                 delete item.placa;
             }
             if (type === 'trucks' && item.placa) item.status = item.status || 'ativo';
+            if (type === 'freights') item.userId = driverId;
             items.push(item);
         }
 
