@@ -188,6 +188,7 @@ Pages.driverClosing = {
     _diasTrabalhados: null,
     _diasNoMes: null,
     _salarioFixoBase: 0,
+    _includeMediaPremio: true,
 
     async render(userId) {
         this.userId = userId;
@@ -195,6 +196,7 @@ Pages.driverClosing = {
         this._diasTrabalhados = null;
         this._diasNoMes = null;
         this._salarioFixoBase = 0;
+        this._includeMediaPremio = true;
         const users = await db.getAll('users');
         const drivers = users.filter(u => u.role === 'motorista');
         const trucks = await db.getAll('trucks');
@@ -496,6 +498,13 @@ Pages.driverClosing = {
                 saved.diasTrabalhados, saved.diasNoMes
             );
             if (!closingData) { Utils.showToast('Erro ao carregar dados do fechamento', 'error'); return; }
+
+            // Respect the "incluir prêmio de média" choice saved with this fechamento
+            const includeMedia = saved.premioMediaIncluido !== false;
+            this._includeMediaPremio = includeMedia;
+            closingData.premioMediaIncluido = includeMedia;
+            if (!includeMedia) closingData.totalPagar -= (closingData.premioMedia || 0);
+
             this._lastClosing = closingData;
             this.exportPDF();
         } catch(e) {
@@ -574,6 +583,11 @@ Pages.driverClosing = {
             totalPagar, freights, fuelings, fuelingsForMedia, rates, ratesIsCustom, commRates, commRatesIsCustom
         } = closingData;
 
+        // Toggle "Incluir prêmio de média no acerto" — subtract it from the total when unchecked
+        const totalPagarEff = this._includeMediaPremio ? totalPagar : totalPagar - premioMedia;
+        closingData.totalPagar = totalPagarEff;
+        closingData.premioMediaIncluido = this._includeMediaPremio;
+
         // Build tiered bonus display
         const faixasHtml = faixasPremioMedia.length > 0 ? faixasPremioMedia.sort((a, b) => a.minMedia - b.minMedia).map(f => {
             const atingiu = mediaKmL >= f.minMedia;
@@ -630,13 +644,23 @@ Pages.driverClosing = {
                                 ${comissaoCarregado > 0 ? `<tr><td>Comiss\u00e3o KM Carregado \u2014 ${Utils.formatNumber(kmCarregado)} km \u00d7 ${Utils.formatCurrency(commRates.carregado)}/km \u00d7 ${pctCarregado}%</td><td class="text-right font-bold text-success">${Utils.formatCurrency(comissaoCarregado)}</td></tr>` : ''}
                                 ${comissaoVazio > 0 ? `<tr><td>Comiss\u00e3o KM Vazio \u2014 ${Utils.formatNumber(kmVazio)} km \u00d7 ${Utils.formatCurrency(commRates.vazio)}/km \u00d7 ${pctVazio}%</td><td class="text-right font-bold text-success">${Utils.formatCurrency(comissaoVazio)}</td></tr>` : ''}
                                 ${(qtdFreteFechado || 0) > 0 ? `<tr style="background:rgba(99,102,241,0.05)"><td>\ud83d\udd12 Fretes Valor Fechado (${qtdFreteFechado}x \u2014 ${Utils.formatNumber(kmFreteFechado)} km) \u2014 Comiss\u00e3o</td><td class="text-right font-bold text-success">${Utils.formatCurrency(totalComissaoFechado)}</td></tr>` : ''}
-                                ${premioMedia > 0 ? `<tr style="background:rgba(34,197,94,0.05)"><td><strong>\ud83c\udfc6 Pr\u00eamio M\u00e9dia km/L</strong> \u2014 M\u00e9dia atual: <strong>${mediaKmL.toFixed(2)} km/L</strong></td><td class="text-right font-bold text-success">${Utils.formatCurrency(premioMedia)}</td></tr>` : ''}
+                                ${premioMedia > 0 ? `<tr style="background:rgba(34,197,94,0.05)">
+                                    <td>
+                                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:2px">
+                                            <input type="checkbox" id="dc-include-media" ${this._includeMediaPremio ? 'checked' : ''} onchange="Pages.driverClosing.toggleIncludeMedia()">
+                                            <strong>\ud83c\udfc6 Pr\u00eamio M\u00e9dia km/L</strong>
+                                        </label>
+                                        <span style="margin-left:24px">\u2014 M\u00e9dia atual: <strong>${mediaKmL.toFixed(2)} km/L</strong></span>
+                                        ${!this._includeMediaPremio ? '<br><small class="text-muted" style="margin-left:24px">N\u00e3o inclu\u00eddo neste acerto</small>' : ''}
+                                    </td>
+                                    <td class="text-right font-bold ${this._includeMediaPremio ? 'text-success' : 'text-muted'}" style="${!this._includeMediaPremio ? 'text-decoration:line-through' : ''}">${Utils.formatCurrency(premioMedia)}</td>
+                                </tr>` : ''}
                                 ${faixasHtml}
                                 ${bonuses.map(b => `<tr><td>\ud83c\udf81 ${b.descricao || 'B\u00f4nus'} <small class="text-muted">(${Utils.formatDate(b.data)})</small></td><td class="text-right font-bold text-success">${Utils.formatCurrency(b.valor)}</td></tr>`).join('')}
                                 ${expenses.map(e => `<tr><td>\ud83d\udccb Reembolso: ${e.descricao || 'Despesa'} <small class="text-muted">(${Utils.formatDate(e.data)})</small></td><td class="text-right font-bold text-info">${Utils.formatCurrency(e.valor)}</td></tr>`).join('')}
                                 ${discounts.map(d => `<tr style="color:var(--accent-danger)"><td>\ud83d\udcb8 Vale/Adiantamento: ${d.descricao || 'Vale'} <small class="text-muted">(${Utils.formatDate(d.data)})</small></td><td class="text-right font-bold">-${Utils.formatCurrency(d.valor)}</td></tr>`).join('')}
                             </tbody>
-                            <tfoot><tr style="background:rgba(99,102,241,0.1)"><td class="font-bold" style="font-size:1.05rem">TOTAL A PAGAR</td><td class="text-right font-bold ${totalPagar >= 0 ? 'text-success' : 'text-danger'}" style="font-size:1.2rem">${Utils.formatCurrency(totalPagar)}</td></tr></tfoot>
+                            <tfoot><tr style="background:rgba(99,102,241,0.1)"><td class="font-bold" style="font-size:1.05rem">TOTAL A PAGAR</td><td class="text-right font-bold ${totalPagarEff >= 0 ? 'text-success' : 'text-danger'}" style="font-size:1.2rem">${Utils.formatCurrency(totalPagarEff)}</td></tr></tfoot>
                         </table>
                     </div>
 
@@ -715,9 +739,10 @@ Pages.driverClosing = {
         // Recalculate premio
         const { premio, faixaAtingida } = db.calcPremioMedia(media, closing.faixasPremioMedia || []);
 
-        // Update totalPagar
+        // Update totalPagar (only add/remove the premio from the total if it's included in the acerto)
         const oldPremio = closing.premioMedia || 0;
-        const newTotalPagar = closing.totalPagar - oldPremio + premio;
+        const baseTotalPagar = closing.totalPagar - (this._includeMediaPremio ? oldPremio : 0);
+        const newTotalPagar = baseTotalPagar + (this._includeMediaPremio ? premio : 0);
 
         // Update stored closing for PDF
         closing.mediaKmL = parseFloat(media.toFixed(2));
@@ -726,6 +751,9 @@ Pages.driverClosing = {
         closing.premioMedia = premio;
         closing.faixaAtingida = faixaAtingida;
         closing.totalPagar = newTotalPagar;
+        closing.mediaFuelStart = startFuel;
+        closing.mediaFuelEnd = endFuel;
+        closing.premioMediaIncluido = this._includeMediaPremio;
 
         // Update UI
         if (resultEl) {
@@ -749,8 +777,11 @@ Pages.driverClosing = {
             if (row.innerHTML.includes('Pr\u00eamio M\u00e9dia km/L') || row.innerHTML.includes('Prêmio Média km/L')) {
                 const cells = row.querySelectorAll('td');
                 if (cells.length >= 2) {
-                    cells[0].innerHTML = '<strong>\ud83c\udfc6 Pr\u00eamio M\u00e9dia km/L</strong> \u2014 M\u00e9dia atual: <strong>' + media.toFixed(2) + ' km/L</strong>';
+                    const noteHtml = !this._includeMediaPremio ? '<br><small class="text-muted" style="margin-left:24px">N\u00e3o inclu\u00eddo neste acerto</small>' : '';
+                    cells[0].innerHTML = '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:2px"><input type="checkbox" id="dc-include-media" ' + (this._includeMediaPremio ? 'checked' : '') + ' onchange="Pages.driverClosing.toggleIncludeMedia()"><strong>\ud83c\udfc6 Pr\u00eamio M\u00e9dia km/L</strong></label><span style="margin-left:24px">\u2014 M\u00e9dia atual: <strong>' + media.toFixed(2) + ' km/L</strong></span>' + noteHtml;
                     cells[1].innerHTML = Utils.formatCurrency(premio);
+                    cells[1].className = 'text-right font-bold ' + (this._includeMediaPremio ? 'text-success' : 'text-muted');
+                    cells[1].style.textDecoration = this._includeMediaPremio ? 'none' : 'line-through';
                 }
             }
         });
@@ -779,6 +810,51 @@ Pages.driverClosing = {
                 if (cells.length >= 2) {
                     cells[1].innerHTML = Utils.formatCurrency(newTotalPagar);
                     cells[1].className = 'text-right font-bold ' + (newTotalPagar >= 0 ? 'text-success' : 'text-danger');
+                }
+            }
+        });
+    },
+
+    toggleIncludeMedia() {
+        const closing = this._lastClosing;
+        if (!closing) return;
+
+        const checkbox = document.getElementById('dc-include-media');
+        const checked = checkbox ? checkbox.checked : true;
+        const premio = closing.premioMedia || 0;
+
+        closing.totalPagar = checked ? closing.totalPagar + premio : closing.totalPagar - premio;
+        closing.premioMediaIncluido = checked;
+        this._includeMediaPremio = checked;
+
+        // Update premio row (note + strikethrough) — keep the checkbox in the DOM in sync
+        const tableRows = document.querySelectorAll('.data-table tr');
+        tableRows.forEach(row => {
+            if (row.innerHTML.includes('Prêmio Média km/L') || row.innerHTML.includes('Prêmio Média km/L')) {
+                const cells = row.querySelectorAll('td');
+                if (cells.length >= 2) {
+                    const noteEl = cells[0].querySelector('small');
+                    const label = cells[0].querySelector('label');
+                    if (label && !noteEl && !checked) {
+                        label.insertAdjacentHTML('afterend', '<br><small class="text-muted" style="margin-left:24px">Não incluído neste acerto</small>');
+                    } else if (noteEl && checked) {
+                        noteEl.previousSibling?.remove(); // the <br>
+                        noteEl.remove();
+                    }
+                    cells[1].className = 'text-right font-bold ' + (checked ? 'text-success' : 'text-muted');
+                    cells[1].style.textDecoration = checked ? 'none' : 'line-through';
+                }
+            }
+        });
+
+        // Update total a pagar
+        const footerRows = document.querySelectorAll('.data-table tfoot tr');
+        footerRows.forEach(row => {
+            if (row.innerHTML.includes('TOTAL A PAGAR')) {
+                const cells = row.querySelectorAll('td');
+                if (cells.length >= 2) {
+                    cells[1].innerHTML = Utils.formatCurrency(closing.totalPagar);
+                    cells[1].className = 'text-right font-bold ' + (closing.totalPagar >= 0 ? 'text-success' : 'text-danger');
                 }
             }
         });
@@ -944,12 +1020,8 @@ Pages.driverClosing = {
                     ${c.comissaoCarregado > 0 ? `<tr><td>Comissão KM Carregado — ${Utils.formatNumber(c.kmCarregado)} km × ${Utils.formatCurrency(c.commRates.carregado)}/km × ${c.pctCarregado}%${c.commRatesIsCustom ? ' (taxa própria do motorista)' : ' (taxa da placa/padrão)'}</td><td class="text-right">${Utils.formatCurrency(c.comissaoCarregado)}</td></tr>` : ''}
                     ${c.comissaoVazio > 0 ? `<tr><td>Comissão KM Vazio — ${Utils.formatNumber(c.kmVazio)} km × ${Utils.formatCurrency(c.commRates.vazio)}/km × ${c.pctVazio}%${c.commRatesIsCustom ? ' (taxa própria do motorista)' : ' (taxa da placa/padrão)'}</td><td class="text-right">${Utils.formatCurrency(c.comissaoVazio)}</td></tr>` : ''}
                     ${(c.qtdFreteFechado || 0) > 0 ? `<tr style="background:#f0f0ff"><td>🔒 Fretes Valor Fechado (${c.qtdFreteFechado}x — ${Utils.formatNumber(c.kmFreteFechado)} km) — Comissão</td><td class="text-right"><strong>${Utils.formatCurrency(c.totalComissaoFechado)}</strong></td></tr>` : ''}
-                    ${c.premioMedia > 0 ? `<tr style="background:#f0fff0"><td><strong>Prêmio Média km/L</strong> — Média atual: <strong>${c.mediaKmL} km/L</strong></td><td class="text-right"><strong>${Utils.formatCurrency(c.premioMedia)}</strong></td></tr>` : ''}
-                    ${(c.faixasPremioMedia || []).sort((a, b) => a.minMedia - b.minMedia).map(f => {
-            const atingiu = c.mediaKmL >= f.minMedia;
-            const isAtual = c.faixaAtingida && f.minMedia === c.faixaAtingida.minMedia;
-            return `<tr><td style="padding-left:24px;color:#666">${atingiu ? '✅' : '❌'} Faixa ${f.minMedia} km/L${isAtual ? ' — <strong>APLICADO</strong>' : ''}</td><td class="text-right" style="font-size:11px">${Utils.formatCurrency(f.premio)}</td></tr>`;
-        }).join('')}
+                    ${c.premioMedia > 0 ? `<tr style="background:#f0fff0"><td><strong>Prêmio Média km/L</strong> — Média atual: <strong>${c.mediaKmL} km/L</strong>${c.mediaFuelStart && c.mediaFuelEnd ? `<br><small style="color:#888">Abastecidas consideradas: ${Utils.formatDate(c.mediaFuelStart.data)} a ${Utils.formatDate(c.mediaFuelEnd.data)}</small>` : ''}${this._includeMediaPremio === false ? '<br><small style="color:#b91c1c">Não incluído neste acerto</small>' : ''}</td><td class="text-right" style="${this._includeMediaPremio === false ? 'text-decoration:line-through;color:#999' : ''}"><strong>${Utils.formatCurrency(c.premioMedia)}</strong></td></tr>` : ''}
+                    ${c.faixaAtingida ? `<tr><td style="padding-left:24px;color:#666">✅ Faixa ${c.faixaAtingida.minMedia} km/L — <strong>APLICADO</strong></td><td class="text-right" style="font-size:11px">${Utils.formatCurrency(c.faixaAtingida.premio)}</td></tr>` : ''}
                     ${c.bonuses.map(b => `<tr><td>Prêmio: ${b.descricao} (${Utils.formatDate(b.data)})</td><td class="text-right">${Utils.formatCurrency(b.valor)}</td></tr>`).join('')}
                     ${c.expenses.map(e => `<tr><td>Reembolso: ${e.descricao} (${Utils.formatDate(e.data)})</td><td class="text-right">${Utils.formatCurrency(e.valor)}</td></tr>`).join('')}
                     ${c.discounts.map(d => `<tr style="color:#b91c1c"><td>Vale: ${d.descricao} (${Utils.formatDate(d.data)})</td><td class="text-right">-${Utils.formatCurrency(d.valor)}</td></tr>`).join('')}
