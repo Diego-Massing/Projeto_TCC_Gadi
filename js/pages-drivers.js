@@ -658,7 +658,7 @@ Pages.driverClosing = {
                                 ${faixasHtml}
                                 ${bonuses.map(b => `<tr><td>\ud83c\udf81 ${b.descricao || 'B\u00f4nus'} <small class="text-muted">(${Utils.formatDate(b.data)})</small></td><td class="text-right font-bold text-success">${Utils.formatCurrency(b.valor)}</td></tr>`).join('')}
                                 ${expenses.map(e => `<tr><td>\ud83d\udccb Reembolso: ${e.descricao || 'Despesa'} <small class="text-muted">(${Utils.formatDate(e.data)})</small></td><td class="text-right font-bold text-info">${Utils.formatCurrency(e.valor)}</td></tr>`).join('')}
-                                ${discounts.map(d => `<tr style="color:var(--accent-danger)"><td>\ud83d\udcb8 Vale/Adiantamento: ${d.descricao || 'Vale'} <small class="text-muted">(${Utils.formatDate(d.data)})</small></td><td class="text-right font-bold">-${Utils.formatCurrency(d.valor)}</td></tr>`).join('')}
+                                ${discounts.map(d => `<tr style="color:var(--accent-danger)"><td>\ud83d\udcb8 ${d.descricao || 'Vale'} <small class="text-muted">(${Utils.formatDate(d.data)})</small></td><td class="text-right font-bold">-${Utils.formatCurrency(d.valor)}</td></tr>`).join('')}
                             </tbody>
                             <tfoot><tr style="background:rgba(99,102,241,0.1)"><td class="font-bold" style="font-size:1.05rem">TOTAL A PAGAR</td><td class="text-right font-bold ${totalPagarEff >= 0 ? 'text-success' : 'text-danger'}" style="font-size:1.2rem">${Utils.formatCurrency(totalPagarEff)}</td></tr></tfoot>
                         </table>
@@ -1024,7 +1024,7 @@ Pages.driverClosing = {
                     ${c.faixaAtingida ? `<tr><td style="padding-left:24px;color:#666">✅ Faixa ${c.faixaAtingida.minMedia} km/L — <strong>APLICADO</strong></td><td class="text-right" style="font-size:11px">${Utils.formatCurrency(c.faixaAtingida.premio)}</td></tr>` : ''}
                     ${c.bonuses.map(b => `<tr><td>Prêmio: ${b.descricao} (${Utils.formatDate(b.data)})</td><td class="text-right">${Utils.formatCurrency(b.valor)}</td></tr>`).join('')}
                     ${c.expenses.map(e => `<tr><td>Reembolso: ${e.descricao} (${Utils.formatDate(e.data)})</td><td class="text-right">${Utils.formatCurrency(e.valor)}</td></tr>`).join('')}
-                    ${c.discounts.map(d => `<tr style="color:#b91c1c"><td>Vale: ${d.descricao} (${Utils.formatDate(d.data)})</td><td class="text-right">-${Utils.formatCurrency(d.valor)}</td></tr>`).join('')}
+                    ${c.discounts.map(d => `<tr style="color:#b91c1c"><td>${d.descricao || 'Vale'} (${Utils.formatDate(d.data)})</td><td class="text-right">-${Utils.formatCurrency(d.valor)}</td></tr>`).join('')}
                     <tr class="total-row"><td>TOTAL A PAGAR</td><td class="text-right">${Utils.formatCurrency(c.totalPagar)}</td></tr>
                 </tbody>
             </table>
