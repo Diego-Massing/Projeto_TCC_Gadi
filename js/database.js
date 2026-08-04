@@ -664,10 +664,15 @@ class FrotaDatabase {
         const comissaoVazio = valorKmVazio * (pctVazio / 100);
         const totalComissaoKm = comissaoCarregado + comissaoVazio;
 
-        // Fuel Efficiency
-        const totalLitros = fuelings.filter(f => f.tipoComb !== 'Arla').reduce((s, f) => s + (f.litros || 0), 0);
-        const kmValues = fuelings.filter(f => f.km > 0 && f.tipoComb !== 'Arla').map(f => f.km);
-        const totalKm = kmValues.length >= 2 ? Math.max(...kmValues) - Math.min(...kmValues) : 0;
+        // Fuel Efficiency — use fuelingsForMedia (includes previous month as anchor) so a period
+        // with a single fueling still has a valid start point, same formula the UI uses to let the
+        // user pick start/end abastecidas: (km final − km inicial) / (litros − litros da inicial)
+        const allFuelMedia = fuelingsForMedia.filter(f => f.km > 0 && f.tipoComb !== 'Arla').sort((a, b) => (a.data || '').localeCompare(b.data || '') || (a.km - b.km));
+        let totalKm = 0, totalLitros = 0;
+        if (allFuelMedia.length >= 2) {
+            totalKm = allFuelMedia[allFuelMedia.length - 1].km - allFuelMedia[0].km;
+            totalLitros = allFuelMedia.slice(1).reduce((s, f) => s + (f.litros || 0), 0);
+        }
         const mediaKmL = totalKm > 0 && totalLitros > 0 ? totalKm / totalLitros : 0;
         const { premio: premioMedia, faixaAtingida } = this.calcPremioMedia(mediaKmL, commConfig.faixasPremioMedia);
 
