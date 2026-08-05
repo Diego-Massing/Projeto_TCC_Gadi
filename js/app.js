@@ -49,7 +49,7 @@ Pages.monthlyClosing = {
     showMediaSelector(idx) {
         const c = this._closingsData[idx];
         if (!c) return;
-        const allF = (c.fuelingsForMedia || c.fuelings || []).filter(f => f.km > 0 && f.tipoComb !== 'Arla').sort((a, b) => (a.data || '').localeCompare(b.data || '') || (a.km - b.km));
+        const allF = Utils.fuelAnchors(c.fuelingsForMedia || c.fuelings || []);
         if (allF.length < 2) {
             document.getElementById('media-selector-area').innerHTML = `<div class="card mt-3 animate-in" style="border:2px solid var(--accent-warning)"><div class="card-body"><p class="text-muted text-center">⚠️ ${c.placa}: precisa de no mínimo 2 abastecidas com KM para calcular a média.</p></div></div>`;
             return;
@@ -83,22 +83,21 @@ Pages.monthlyClosing = {
         if (!c) return;
         const startId = parseInt(document.getElementById('mc-fuel-start')?.value);
         const endId = parseInt(document.getElementById('mc-fuel-end')?.value);
-        const fuelings = (c.fuelingsForMedia || c.fuelings || []).filter(f => f.km > 0 && f.tipoComb !== 'Arla').sort((a, b) => (a.data || '').localeCompare(b.data || '') || (a.km - b.km));
+        const allSorted = Utils.fuelSorted(c.fuelingsForMedia || c.fuelings || []);
+        const fuelings = Utils.fuelAnchors(c.fuelingsForMedia || c.fuelings || []);
         const startFuel = fuelings.find(f => f.id === startId);
         const endFuel = fuelings.find(f => f.id === endId);
         const resultEl = document.getElementById('mc-calc-result');
         if (!startFuel || !endFuel) { if (resultEl) resultEl.innerHTML = '<span class="text-muted">Selecione ambas as abastecidas.</span>'; return; }
         if (endFuel.km <= startFuel.km) { if (resultEl) resultEl.innerHTML = '<span style="color:var(--accent-danger)">⚠️ A abastecida final deve ter KM maior que a inicial.</span>'; return; }
-        const startIdx = fuelings.indexOf(startFuel);
-        const endIdx = fuelings.indexOf(endFuel);
-        const range = fuelings.slice(startIdx, endIdx + 1);
-        const litrosRange = range.slice(1).reduce((s, f) => s + (f.litros || 0), 0);
+        const litrosRange = Utils.fuelRangeLitros(allSorted, startFuel, endFuel);
+        const qtdAbastecidas = allSorted.slice(allSorted.indexOf(startFuel) + 1, allSorted.indexOf(endFuel) + 1).length;
         const kmDiff = endFuel.km - startFuel.km;
         const media = litrosRange > 0 ? kmDiff / litrosRange : 0;
         if (resultEl) {
             resultEl.innerHTML = `<div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center">
                 <div>📏 KM: <strong>${Utils.formatNumber(kmDiff)}</strong> <span class="text-muted">(${Utils.formatNumber(endFuel.km)} − ${Utils.formatNumber(startFuel.km)})</span></div>
-                <div>⛽ Litros: <strong>${Utils.formatNumber(litrosRange, 1)}</strong> <span class="text-muted">(${range.length - 1} abastecidas)</span></div>
+                <div>⛽ Litros: <strong>${Utils.formatNumber(litrosRange, 1)}</strong> <span class="text-muted">(${qtdAbastecidas} abastecidas)</span></div>
                 <div style="font-size:1.2rem;color:var(--accent-success)">📊 Média: <strong>${media.toFixed(2)} km/L</strong></div>
             </div>`;
         }

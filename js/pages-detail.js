@@ -265,7 +265,7 @@ Pages.truckDetail = {
         const closing = await db.generateTruckClosingByDateRange(this.truckId, dataInicio, dataFim);
         this._lastTruckClosing = closing;
         const allFuelings = closing.fuelingsForMedia || closing.fuelings || [];
-        const sortedFuelings = allFuelings.filter(f => f.km > 0 && f.tipoComb !== 'Arla').sort((a, b) => (a.data || '').localeCompare(b.data || '') || (a.km - b.km));
+        const sortedFuelings = Utils.fuelAnchors(allFuelings);
 
         const dci = closing.driverClosingInfo;
 
@@ -483,7 +483,9 @@ Pages.truckDetail = {
         const startId = parseInt(document.getElementById('truck-media-start')?.value);
         const endId = parseInt(document.getElementById('truck-media-end')?.value);
 
-        const fuelings = (closing.fuelingsForMedia || closing.fuelings || []).filter(f => f.km > 0 && f.tipoComb !== 'Arla').sort((a, b) => (a.data || '').localeCompare(b.data || '') || (a.km - b.km));
+        const allFuelData = closing.fuelingsForMedia || closing.fuelings || [];
+        const allSorted = Utils.fuelSorted(allFuelData);
+        const fuelings = Utils.fuelAnchors(allFuelData);
         const startFuel = fuelings.find(f => f.id === startId);
         const endFuel = fuelings.find(f => f.id === endId);
 
@@ -497,10 +499,8 @@ Pages.truckDetail = {
             return;
         }
 
-        const startIdx = fuelings.indexOf(startFuel);
-        const endIdx = fuelings.indexOf(endFuel);
-        const range = fuelings.slice(startIdx, endIdx + 1);
-        const litrosRange = range.slice(1).reduce((s, f) => s + (f.litros || 0), 0);
+        const litrosRange = Utils.fuelRangeLitros(allSorted, startFuel, endFuel);
+        const qtdAbastecidas = allSorted.slice(allSorted.indexOf(startFuel) + 1, allSorted.indexOf(endFuel) + 1).length;
         const kmDiff = endFuel.km - startFuel.km;
         const media = litrosRange > 0 ? kmDiff / litrosRange : 0;
 
@@ -511,7 +511,7 @@ Pages.truckDetail = {
         if (resultEl) {
             resultEl.innerHTML = '<div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center">' +
                 '<div>\ud83d\udccf KM: <strong>' + Utils.formatNumber(kmDiff) + '</strong> <span class="text-muted">(' + Utils.formatNumber(endFuel.km) + ' \u2212 ' + Utils.formatNumber(startFuel.km) + ')</span></div>' +
-                '<div>\u26fd Litros: <strong>' + Utils.formatNumber(litrosRange, 1) + '</strong> <span class="text-muted">(' + (range.length - 1) + ' abastecidas)</span></div>' +
+                '<div>\u26fd Litros: <strong>' + Utils.formatNumber(litrosRange, 1) + '</strong> <span class="text-muted">(' + qtdAbastecidas + ' abastecidas)</span></div>' +
                 '<div style="font-size:1.2rem;color:var(--accent-success)">\ud83d\udcca M\u00e9dia: <strong>' + media.toFixed(2) + ' km/L</strong></div>' +
                 '</div>';
         }

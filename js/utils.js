@@ -1,6 +1,29 @@
 // ===== UTILITY MODULE =====
 
 const Utils = {
+    // All fuelings (excl. Arla) sorted by date/km — used both as the full timeline for
+    // litros sums and as the base list from which anchors (entries with km) are derived.
+    fuelSorted(fuelings) {
+        return (fuelings || []).filter(f => f.tipoComb !== 'Arla').sort((a, b) => (a.data || '').localeCompare(b.data || '') || (a.km || 0) - (b.km || 0));
+    },
+
+    // Entries usable as range boundaries for the média km/L calc — need a km value to
+    // anchor the km delta. Entries without km are NOT excluded from litros, only from
+    // being pickable as start/end (see fuelRangeLitros).
+    fuelAnchors(fuelings) {
+        return this.fuelSorted(fuelings).filter(f => f.km > 0);
+    },
+
+    // Litros consumed between two anchors, counted over the FULL sorted timeline so that
+    // any in-between fueling without km still contributes its litros to the average —
+    // only the km delta comes strictly from the two anchor points.
+    fuelRangeLitros(allSorted, startFuel, endFuel) {
+        const startIdx = allSorted.indexOf(startFuel);
+        const endIdx = allSorted.indexOf(endFuel);
+        if (startIdx === -1 || endIdx === -1) return 0;
+        return allSorted.slice(startIdx + 1, endIdx + 1).reduce((s, f) => s + (f.litros || 0), 0);
+    },
+
     // Format currency (BRL)
     formatCurrency(value) {
         return new Intl.NumberFormat('pt-BR', {
