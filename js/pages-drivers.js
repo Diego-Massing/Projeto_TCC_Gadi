@@ -644,7 +644,7 @@ Pages.driverClosing = {
                                 ${comissaoCarregado > 0 ? `<tr><td>Comiss\u00e3o KM Carregado \u2014 ${Utils.formatNumber(kmCarregado)} km \u00d7 ${Utils.formatCurrency(commRates.carregado)}/km \u00d7 ${pctCarregado}%</td><td class="text-right font-bold text-success">${Utils.formatCurrency(comissaoCarregado)}</td></tr>` : ''}
                                 ${comissaoVazio > 0 ? `<tr><td>Comiss\u00e3o KM Vazio \u2014 ${Utils.formatNumber(kmVazio)} km \u00d7 ${Utils.formatCurrency(commRates.vazio)}/km \u00d7 ${pctVazio}%</td><td class="text-right font-bold text-success">${Utils.formatCurrency(comissaoVazio)}</td></tr>` : ''}
                                 ${(qtdFreteFechado || 0) > 0 ? `<tr style="background:rgba(99,102,241,0.05)"><td>\ud83d\udd12 Fretes Valor Fechado (${qtdFreteFechado}x \u2014 ${Utils.formatNumber(kmFreteFechado)} km) \u2014 Comiss\u00e3o</td><td class="text-right font-bold text-success">${Utils.formatCurrency(totalComissaoFechado)}</td></tr>` : ''}
-                                ${premioMedia > 0 ? `<tr style="background:rgba(34,197,94,0.05)">
+                                ${(faixasPremioMedia.length > 0 && Utils.fuelAnchors(fuelingsForMedia || fuelings || []).length >= 2) ? `<tr style="background:rgba(34,197,94,0.05)">
                                     <td>
                                         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:2px">
                                             <input type="checkbox" id="dc-include-media" ${this._includeMediaPremio ? 'checked' : ''} onchange="Pages.driverClosing.toggleIncludeMedia()">
