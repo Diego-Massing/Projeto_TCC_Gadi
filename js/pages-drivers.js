@@ -1,5 +1,7 @@
 // ===== USERS / DRIVERS PAGE =====
 Pages.users = {
+    _statusFilter: 'ativos',
+
     async render() {
         const users = await db.getAll('users');
         const trucks = await db.getAll('trucks');
@@ -7,20 +9,36 @@ Pages.users = {
         const admins = users.filter(u => u.role === 'admin');
         const viewers = users.filter(u => u.role === 'visualizador');
 
+        const filter = this._statusFilter;
+        const visibleUsers = users.filter(u => {
+            if (u.role !== 'motorista') return true;
+            if (filter === 'ativos') return u.ativo !== false;
+            if (filter === 'inativos') return u.ativo === false;
+            return true;
+        });
+
         document.getElementById('page-content').innerHTML = `
             <div class="page-header"><div class="page-header-row">
                 <div><h1 class="page-title">👥 Usuários</h1><p class="page-subtitle">${users.length} usuários — ${drivers.length} motoristas, ${admins.length} admins, ${viewers.length} visualizadores</p></div>
                 ${App.userRole === 'admin' ? `<button class="btn btn-primary" onclick="Pages.users.showForm()">＋ Novo Usuário</button>` : ''}
             </div></div>
             <div class="page-body">
+                <div class="filter-bar">
+                    <div class="form-group"><label class="form-label">Motoristas</label><select class="form-control" id="filter-users-status" onchange="Pages.users.onFilterChange()">
+                        <option value="ativos" ${filter === 'ativos' ? 'selected' : ''}>Ativos</option>
+                        <option value="inativos" ${filter === 'inativos' ? 'selected' : ''}>Inativos</option>
+                        <option value="todos" ${filter === 'todos' ? 'selected' : ''}>Todos</option>
+                    </select></div>
+                </div>
                 ${users.length === 0 ? '<div class="empty-state"><div class="empty-icon">👥</div><h3>Nenhum usuário cadastrado</h3><p>Adicione motoristas, visualizadores e administradores.</p><button class="btn btn-primary btn-lg" onclick="Pages.users.showForm()">＋ Adicionar Usuário</button></div>' :
-                `<div class="table-container"><table class="data-table"><thead><tr><th>Nome</th><th>Função</th><th>Login</th><th>Caminhão</th><th>Telefone</th><th>Salário Fixo</th><th></th></tr></thead><tbody>${users.map(u => {
+                `<div class="table-container"><table class="data-table"><thead><tr><th>Nome</th><th>Função</th><th>Login</th><th>Caminhão</th><th>Telefone</th><th>Salário Fixo</th><th></th></tr></thead><tbody>${visibleUsers.map(u => {
                     const truck = trucks.find(t => t.id === u.truckId);
                     const roleColors = { admin: 'badge-info', motorista: 'badge-success', visualizador: 'badge-warning' };
                     const roleLabels = { admin: '🛡️ Admin', motorista: '🚛 Motorista', visualizador: '👁️ Visualizador' };
-                    return `<tr>
+                    const isInactiveDriver = u.role === 'motorista' && u.ativo === false;
+                    return `<tr${isInactiveDriver ? ' style="opacity:0.6"' : ''}>
                             <td class="font-bold">${u.nome || '—'}</td>
-                            <td><span class="badge ${roleColors[u.role] || 'badge-info'}">${roleLabels[u.role] || u.role}</span></td>
+                            <td><span class="badge ${roleColors[u.role] || 'badge-info'}">${roleLabels[u.role] || u.role}</span> ${isInactiveDriver ? '<span class="badge badge-danger" title="Motorista inativo">Inativo</span>' : ''}</td>
                             <td>${u.temLogin ? '<span class="badge badge-success" title="' + (u.authEmail || '') + '">🔐 Sim</span>' : '<span class="text-muted">—</span>'}</td>
                             <td class="font-mono">${truck ? truck.placa : '<span class="text-muted">—</span>'}</td>
                             <td>${u.telefone || '—'}</td>
@@ -28,11 +46,27 @@ Pages.users = {
                             <td>
                                 ${App.userRole === 'admin' ? `<button class="btn btn-icon btn-secondary btn-sm" onclick="Pages.users.showForm(${u.id})">✏️</button>` : ''}
                                 ${u.role === 'motorista' ? `<button class="btn btn-icon btn-secondary btn-sm" onclick="App.navigate('driver-closing',${u.id})" title="Fechamento">📊</button>` : ''}
+                                ${App.userRole === 'admin' && u.role === 'motorista' ? `<button class="btn btn-icon btn-secondary btn-sm" onclick="Pages.users.toggleAtivo(${u.id})" title="${isInactiveDriver ? 'Reativar' : 'Inativar'}">${isInactiveDriver ? '♻️' : '🚫'}</button>` : ''}
                                 ${App.userRole === 'admin' ? `<button class="btn btn-icon btn-sm" style="color:var(--accent-danger)" onclick="Pages.users.remove(${u.id})">🗑️</button>` : ''}
                             </td>
                         </tr>`;
                 }).join('')}</tbody></table></div>`}
             </div>`;
+    },
+
+    onFilterChange() {
+        this._statusFilter = document.getElementById('filter-users-status').value;
+        this.render();
+    },
+
+    async toggleAtivo(id) {
+        const user = await db.getById('users', id);
+        if (!user) return;
+        const novoStatus = user.ativo === false;
+        if (!confirm(novoStatus ? `Reativar ${user.nome}?` : `Inativar ${user.nome}? Ele deixará de aparecer para novos fretes e fechamentos, mas o histórico é mantido.`)) return;
+        await db.update('users', { id, ativo: novoStatus });
+        Utils.showToast(novoStatus ? 'Motorista reativado' : 'Motorista inativado', 'success');
+        this.render();
     },
 
     async showForm(id) {
@@ -189,6 +223,7 @@ Pages.driverClosing = {
     _diasNoMes: null,
     _salarioFixoBase: 0,
     _includeMediaPremio: true,
+    _excludedFreightIds: new Set(),
 
     async render(userId) {
         this.userId = userId;
@@ -197,8 +232,9 @@ Pages.driverClosing = {
         this._diasNoMes = null;
         this._salarioFixoBase = 0;
         this._includeMediaPremio = true;
+        this._excludedFreightIds = new Set();
         const users = await db.getAll('users');
-        const drivers = users.filter(u => u.role === 'motorista');
+        const drivers = users.filter(u => u.role === 'motorista' && (u.ativo !== false || u.id === userId));
         const trucks = await db.getAll('trucks');
         const hoje = new Date();
         const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
@@ -570,6 +606,11 @@ Pages.driverClosing = {
         const closingData = await db.generateDriverClosingByDateRange(userId, dataInicio, dataFim, diasTrabalhados, diasNoMesOverride);
         if (!closingData) { document.getElementById('driver-closing-result').innerHTML = '<div class="empty-state"><h3>Motorista não encontrado</h3></div>'; return; }
 
+        this._excludedFreightIds = new Set();
+        Object.assign(closingData, this._computeTotals(closingData, this._excludedFreightIds));
+        closingData.excludedFreightIds = [];
+        closingData.premioMediaIncluido = this._includeMediaPremio;
+
         this._lastClosing = closingData; // Store for PDF
 
         const {
@@ -583,41 +624,13 @@ Pages.driverClosing = {
             totalPagar, freights, fuelings, fuelingsForMedia, rates, ratesIsCustom, commRates, commRatesIsCustom
         } = closingData;
 
-        // Toggle "Incluir prêmio de média no acerto" — subtract it from the total when unchecked
-        const totalPagarEff = this._includeMediaPremio ? totalPagar : totalPagar - premioMedia;
-        closingData.totalPagar = totalPagarEff;
-        closingData.premioMediaIncluido = this._includeMediaPremio;
-
-        // Build tiered bonus display
-        const faixasHtml = faixasPremioMedia.length > 0 ? faixasPremioMedia.sort((a, b) => a.minMedia - b.minMedia).map(f => {
-            const atingiu = mediaKmL >= f.minMedia;
-            const isAtual = faixaAtingida && f.minMedia === faixaAtingida.minMedia && f.premio === faixaAtingida.premio;
-            return `<tr>
-                <td style="padding-left:24px">${atingiu ? '\u2705' : '\u274c'} Faixa ${f.minMedia} km/L \u2014 ${isAtual ? '<strong>PR\u00caMIO APLICADO</strong>' : (atingiu ? 'Atingida' : 'N\u00e3o atingida')}</td>
-                <td class="text-right font-bold ${isAtual ? 'text-success' : 'text-muted'}">${Utils.formatCurrency(f.premio)}</td>
-            </tr>`;
-        }).join('') : '<tr><td style="padding-left:24px" class="text-muted">Nenhuma faixa de pr\u00eamio configurada</td><td></td></tr>';
 
         const ratesLabel = ratesIsCustom ? `\ud83d\ude9b Taxa da placa (frete): ${Utils.formatCurrency(rates.carregado)}/km (C) | ${Utils.formatCurrency(rates.vazio)}/km (V)` : `\u2699\ufe0f Taxa padr\u00e3o (frete): ${Utils.formatCurrency(rates.carregado)}/km (C) | ${Utils.formatCurrency(rates.vazio)}/km (V)`;
         const commRatesLabel = commRatesIsCustom ? `\ud83d\udc64 Taxa do motorista (comiss\u00e3o): ${Utils.formatCurrency(commRates.carregado)}/km (C) | ${Utils.formatCurrency(commRates.vazio)}/km (V)` : `\u2699\ufe0f Comiss\u00e3o usando taxa da placa/padr\u00e3o (motorista sem taxa pr\u00f3pria cadastrada)`;
 
-        // Detailed Freights Table (Routes)
-        const routesTable = freights.length > 0 ? `
-            <div class="table-container" style="margin-top:20px;border:1px solid var(--border-color);border-radius:var(--radius-md)">
-                <table class="data-table">
-                    <thead><tr><th colspan="5" style="background:var(--bg-secondary);text-align:center">DETALHAMENTO DE ROTAS / FRETES</th></tr>
-                    <tr><th>Data</th><th>Origem \u279c Destino</th><th>KM</th><th>Tipo</th><th>Valor do Frete</th></tr></thead>
-                    <tbody>${freights.map(f => `
-                        <tr>
-                            <td>${Utils.formatDate(f.data)}</td>
-                            <td>${f.origem} \u279c ${f.destino}</td>
-                            <td>${Utils.formatNumber(f.km)}</td>
-                            <td>${f.tipo === 'carregado' ? '<span class="badge badge-success">Carregado</span>' : '<span class="badge badge-warning">Vazio</span>'}</td>
-                            <td class="font-bold">${Utils.formatCurrency(f.valorFrete)}</td>
-                        </tr>`).join('')}
-                    </tbody>
-                </table>
-            </div>` : '<div class="text-muted text-center p-3">Nenhum frete registrado no período.</div>';
+        const routesTable = this._buildRoutesTableHtml(freights, this._excludedFreightIds);
+        const composicaoHtml = this._buildComposicaoHtml(closingData);
+        const summaryHtml = this._buildSummaryHtml(closingData);
 
         document.getElementById('driver-closing-result').innerHTML = `
             <div class="card animate-in" style="border-top: 4px solid var(--accent-primary)">
@@ -636,33 +649,8 @@ Pages.driverClosing = {
                     </div>
 
                     <h4 style="margin:16px 0 10px;font-size:0.85rem;color:var(--accent-primary)">\ud83d\udcb0 COMPOSI\u00c7\u00c3O DO PAGAMENTO</h4>
-                    <div class="table-container" style="margin-bottom:16px">
-                        <table class="data-table">
-                            <thead><tr><th>Descri\u00e7\u00e3o</th><th class="text-right">Valor</th></tr></thead>
-                            <tbody>
-                                ${salarioFixo > 0 ? `<tr><td>Sal\u00e1rio Fixo${dias < diasNoMes ? ' <small class="text-muted">(' + dias + '/' + diasNoMes + ' dias — proporcional de ' + Utils.formatCurrency(salarioFixoBase) + ')</small>' : ''}</td><td class="text-right font-bold">${Utils.formatCurrency(salarioFixo)}</td></tr>` : ''}
-                                ${comissaoCarregado > 0 ? `<tr><td>Comiss\u00e3o KM Carregado \u2014 ${Utils.formatNumber(kmCarregado)} km \u00d7 ${Utils.formatCurrency(commRates.carregado)}/km \u00d7 ${pctCarregado}%</td><td class="text-right font-bold text-success">${Utils.formatCurrency(comissaoCarregado)}</td></tr>` : ''}
-                                ${comissaoVazio > 0 ? `<tr><td>Comiss\u00e3o KM Vazio \u2014 ${Utils.formatNumber(kmVazio)} km \u00d7 ${Utils.formatCurrency(commRates.vazio)}/km \u00d7 ${pctVazio}%</td><td class="text-right font-bold text-success">${Utils.formatCurrency(comissaoVazio)}</td></tr>` : ''}
-                                ${(qtdFreteFechado || 0) > 0 ? `<tr style="background:rgba(99,102,241,0.05)"><td>\ud83d\udd12 Fretes Valor Fechado (${qtdFreteFechado}x \u2014 ${Utils.formatNumber(kmFreteFechado)} km) \u2014 Comiss\u00e3o</td><td class="text-right font-bold text-success">${Utils.formatCurrency(totalComissaoFechado)}</td></tr>` : ''}
-                                ${(faixasPremioMedia.length > 0 && Utils.fuelAnchors(fuelingsForMedia || fuelings || []).length >= 2) ? `<tr style="background:rgba(34,197,94,0.05)">
-                                    <td>
-                                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:2px">
-                                            <input type="checkbox" id="dc-include-media" ${this._includeMediaPremio ? 'checked' : ''} onchange="Pages.driverClosing.toggleIncludeMedia()">
-                                            <strong>\ud83c\udfc6 Pr\u00eamio M\u00e9dia km/L</strong>
-                                        </label>
-                                        <span style="margin-left:24px">\u2014 M\u00e9dia atual: <strong>${mediaKmL.toFixed(2)} km/L</strong></span>
-                                        ${!this._includeMediaPremio ? '<br><small class="text-muted" style="margin-left:24px">N\u00e3o inclu\u00eddo neste acerto</small>' : ''}
-                                    </td>
-                                    <td class="text-right font-bold ${this._includeMediaPremio ? 'text-success' : 'text-muted'}" style="${!this._includeMediaPremio ? 'text-decoration:line-through' : ''}">${Utils.formatCurrency(premioMedia)}</td>
-                                </tr>` : ''}
-                                ${faixasHtml}
-                                ${bonuses.map(b => `<tr><td>\ud83c\udf81 ${b.descricao || 'B\u00f4nus'} <small class="text-muted">(${Utils.formatDate(b.data)})</small></td><td class="text-right font-bold text-success">${Utils.formatCurrency(b.valor)}</td></tr>`).join('')}
-                                ${expenses.map(e => `<tr><td>\ud83d\udccb Reembolso: ${e.descricao || 'Despesa'} <small class="text-muted">(${Utils.formatDate(e.data)})</small></td><td class="text-right font-bold text-info">${Utils.formatCurrency(e.valor)}</td></tr>`).join('')}
-                                ${discounts.map(d => `<tr style="color:var(--accent-danger)"><td>\ud83d\udcb8 ${d.descricao || 'Vale'} <small class="text-muted">(${Utils.formatDate(d.data)})</small></td><td class="text-right font-bold">-${Utils.formatCurrency(d.valor)}</td></tr>`).join('')}
-                            </tbody>
-                            <tfoot><tr style="background:rgba(99,102,241,0.1)"><td class="font-bold" style="font-size:1.05rem">TOTAL A PAGAR</td><td class="text-right font-bold ${totalPagarEff >= 0 ? 'text-success' : 'text-danger'}" style="font-size:1.2rem">${Utils.formatCurrency(totalPagarEff)}</td></tr></tfoot>
-                        </table>
-                    </div>
+                    ${composicaoHtml}
+
 
                     ${routesTable}
 
@@ -691,17 +679,155 @@ Pages.driverClosing = {
                     </div>` : '';
             })()}
 
-                    <div class="closing-summary" style="margin-top:20px">
-                        <div class="closing-item"><div class="closing-label">KM Carregado</div><div class="closing-value">${Utils.formatNumber(totalKmCarregado)}</div></div>
-                        <div class="closing-item"><div class="closing-label">KM Vazio</div><div class="closing-value">${Utils.formatNumber(totalKmVazio)}</div></div>
-                        <div class="closing-item"><div class="closing-label">Total Litros</div><div class="closing-value" id="closing-total-litros">${Utils.formatNumber(totalLitros, 1)}</div></div>
-                        <div class="closing-item"><div class="closing-label">M\u00e9dia km/L</div><div class="closing-value" id="closing-media-kml">${mediaKmL.toFixed(2)}</div></div>
-                    </div>
+                    ${summaryHtml}
                 </div>
             </div>`;
 
         // Trigger initial media calculation with selectors
         if (Utils.fuelAnchors(fuelingsForMedia || fuelings || []).length > 0) this.recalcMedia();
+    },
+
+    _computeTotals(c, excludedIds) {
+        const included = (c.freights || []).filter(f => !excludedIds.has(f.id));
+        const rateFreights = included.filter(f => f.modalidade !== 'fechado');
+        const fixedFreights = included.filter(f => f.modalidade === 'fechado');
+
+        const kmCarregado = rateFreights.filter(f => f.tipo === 'carregado').reduce((s, f) => s + (f.km || 0), 0);
+        const kmVazio = rateFreights.filter(f => f.tipo === 'vazio').reduce((s, f) => s + (f.km || 0), 0);
+        const totalKmCarregado = included.filter(f => f.tipo === 'carregado').reduce((s, f) => s + (f.km || 0), 0);
+        const totalKmVazio = included.filter(f => f.tipo === 'vazio').reduce((s, f) => s + (f.km || 0), 0);
+
+        const valorKmCarregado = kmCarregado * c.commRates.carregado;
+        const valorKmVazio = kmVazio * c.commRates.vazio;
+        const comissaoCarregado = valorKmCarregado * (c.pctCarregado / 100);
+        const comissaoVazio = valorKmVazio * (c.pctVazio / 100);
+        const totalComissaoKm = comissaoCarregado + comissaoVazio;
+
+        const totalComissaoFechado = fixedFreights.reduce((s, f) => s + (f.comissaoFechado || f.valorFrete || 0), 0);
+        const kmFreteFechado = fixedFreights.reduce((s, f) => s + (f.km || 0), 0);
+        const qtdFreteFechado = fixedFreights.length;
+
+        const premioMedia = this._includeMediaPremio ? (c.premioMedia || 0) : 0;
+        const totalPagar = (c.salarioFixo || 0) + totalComissaoKm + totalComissaoFechado + premioMedia + (c.totalExpenses || 0) + (c.totalBonuses || 0) - (c.totalDiscounts || 0);
+
+        return {
+            kmCarregado, kmVazio, totalKmCarregado, totalKmVazio, valorKmCarregado, valorKmVazio,
+            comissaoCarregado, comissaoVazio, totalComissaoKm,
+            totalComissaoFechado, kmFreteFechado, qtdFreteFechado,
+            totalPagar
+        };
+    },
+
+    _buildComposicaoHtml(c) {
+        const faixasHtml = c.faixasPremioMedia.length > 0 ? c.faixasPremioMedia.slice().sort((a, b) => a.minMedia - b.minMedia).map(f => {
+            const atingiu = c.mediaKmL >= f.minMedia;
+            const isAtual = c.faixaAtingida && f.minMedia === c.faixaAtingida.minMedia && f.premio === c.faixaAtingida.premio;
+            return `<tr>
+                <td style="padding-left:24px">${atingiu ? '\u2705' : '\u274c'} Faixa ${f.minMedia} km/L \u2014 ${isAtual ? '<strong>PR\u00caMIO APLICADO</strong>' : (atingiu ? 'Atingida' : 'N\u00e3o atingida')}</td>
+                <td class="text-right font-bold ${isAtual ? 'text-success' : 'text-muted'}">${Utils.formatCurrency(f.premio)}</td>
+            </tr>`;
+        }).join('') : '<tr><td style="padding-left:24px" class="text-muted">Nenhuma faixa de pr\u00eamio configurada</td><td></td></tr>';
+
+        return `<div class="table-container" style="margin-bottom:16px" id="dc-composicao-wrap">
+            <table class="data-table">
+                <thead><tr><th>Descri\u00e7\u00e3o</th><th class="text-right">Valor</th></tr></thead>
+                <tbody>
+                    ${c.salarioFixo > 0 ? `<tr><td>Sal\u00e1rio Fixo${c.diasTrabalhados < c.diasNoMes ? ' <small class="text-muted">(' + c.diasTrabalhados + '/' + c.diasNoMes + ' dias — proporcional de ' + Utils.formatCurrency(c.salarioFixoBase) + ')</small>' : ''}</td><td class="text-right font-bold">${Utils.formatCurrency(c.salarioFixo)}</td></tr>` : ''}
+                    ${c.comissaoCarregado > 0 ? `<tr><td>Comiss\u00e3o KM Carregado \u2014 ${Utils.formatNumber(c.kmCarregado)} km \u00d7 ${Utils.formatCurrency(c.commRates.carregado)}/km \u00d7 ${c.pctCarregado}%</td><td class="text-right font-bold text-success">${Utils.formatCurrency(c.comissaoCarregado)}</td></tr>` : ''}
+                    ${c.comissaoVazio > 0 ? `<tr><td>Comiss\u00e3o KM Vazio \u2014 ${Utils.formatNumber(c.kmVazio)} km \u00d7 ${Utils.formatCurrency(c.commRates.vazio)}/km \u00d7 ${c.pctVazio}%</td><td class="text-right font-bold text-success">${Utils.formatCurrency(c.comissaoVazio)}</td></tr>` : ''}
+                    ${(c.qtdFreteFechado || 0) > 0 ? `<tr style="background:rgba(99,102,241,0.05)"><td>\ud83d\udd12 Fretes Valor Fechado (${c.qtdFreteFechado}x \u2014 ${Utils.formatNumber(c.kmFreteFechado)} km) \u2014 Comiss\u00e3o</td><td class="text-right font-bold text-success">${Utils.formatCurrency(c.totalComissaoFechado)}</td></tr>` : ''}
+                    ${(c.faixasPremioMedia.length > 0 && Utils.fuelAnchors(c.fuelingsForMedia || c.fuelings || []).length >= 2) ? `<tr style="background:rgba(34,197,94,0.05)">
+                        <td>
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:2px">
+                                <input type="checkbox" id="dc-include-media" ${this._includeMediaPremio ? 'checked' : ''} onchange="Pages.driverClosing.toggleIncludeMedia()">
+                                <strong>\ud83c\udfc6 Pr\u00eamio M\u00e9dia km/L</strong>
+                            </label>
+                            <span style="margin-left:24px">\u2014 M\u00e9dia atual: <strong>${c.mediaKmL.toFixed(2)} km/L</strong></span>
+                            ${!this._includeMediaPremio ? '<br><small class="text-muted" style="margin-left:24px">N\u00e3o inclu\u00eddo neste acerto</small>' : ''}
+                        </td>
+                        <td class="text-right font-bold ${this._includeMediaPremio ? 'text-success' : 'text-muted'}" style="${!this._includeMediaPremio ? 'text-decoration:line-through' : ''}">${Utils.formatCurrency(c.premioMedia)}</td>
+                    </tr>` : ''}
+                    ${faixasHtml}
+                    ${c.bonuses.map(b => `<tr><td>\ud83c\udf81 ${b.descricao || 'B\u00f4nus'} <small class="text-muted">(${Utils.formatDate(b.data)})</small></td><td class="text-right font-bold text-success">${Utils.formatCurrency(b.valor)}</td></tr>`).join('')}
+                    ${c.expenses.map(e => `<tr><td>\ud83d\udccb Reembolso: ${e.descricao || 'Despesa'} <small class="text-muted">(${Utils.formatDate(e.data)})</small></td><td class="text-right font-bold text-info">${Utils.formatCurrency(e.valor)}</td></tr>`).join('')}
+                    ${c.discounts.map(d => `<tr style="color:var(--accent-danger)"><td>\ud83d\udcb8 ${d.descricao || 'Vale'} <small class="text-muted">(${Utils.formatDate(d.data)})</small></td><td class="text-right font-bold">-${Utils.formatCurrency(d.valor)}</td></tr>`).join('')}
+                </tbody>
+                <tfoot><tr style="background:rgba(99,102,241,0.1)"><td class="font-bold" style="font-size:1.05rem">TOTAL A PAGAR</td><td class="text-right font-bold ${c.totalPagar >= 0 ? 'text-success' : 'text-danger'}" style="font-size:1.2rem">${Utils.formatCurrency(c.totalPagar)}</td></tr></tfoot>
+            </table>
+        </div>`;
+    },
+
+    _buildRoutesTableHtml(freights, excludedIds) {
+        if (!freights.length) return '<div class="text-muted text-center p-3">Nenhum frete registrado no per\u00edodo.</div>';
+        const allChecked = freights.every(f => !excludedIds.has(f.id));
+        return `
+            <div class="table-container" style="margin-top:20px;border:1px solid var(--border-color);border-radius:var(--radius-md)" id="dc-routes-wrap">
+                <table class="data-table">
+                    <thead><tr><th colspan="6" style="background:var(--bg-secondary);text-align:center">DETALHAMENTO DE ROTAS / FRETES</th></tr>
+                    <tr><th style="width:36px;text-align:center"><input type="checkbox" id="dc-select-all-freights" ${allChecked ? 'checked' : ''} onchange="Pages.driverClosing.toggleAllFreights(this.checked)" title="Marcar/desmarcar todos"></th><th>Data</th><th>Origem \u279c Destino</th><th>KM</th><th>Tipo</th><th>Valor do Frete</th></tr></thead>
+                    <tbody>${freights.map(f => {
+                        const checked = !excludedIds.has(f.id);
+                        return `
+                        <tr${checked ? '' : ' style="opacity:0.5"'}>
+                            <td style="text-align:center"><input type="checkbox" class="dc-freight-check" data-id="${f.id}" ${checked ? 'checked' : ''} onchange="Pages.driverClosing.recalcFromSelection()"></td>
+                            <td>${Utils.formatDate(f.data)}</td>
+                            <td>${f.origem} \u279c ${f.destino}</td>
+                            <td>${Utils.formatNumber(f.km)}</td>
+                            <td>${f.tipo === 'carregado' ? '<span class="badge badge-success">Carregado</span>' : '<span class="badge badge-warning">Vazio</span>'}</td>
+                            <td class="font-bold">${Utils.formatCurrency(f.valorFrete)}</td>
+                        </tr>`;
+                    }).join('')}
+                    </tbody>
+                </table>
+                <div class="text-muted" style="padding:8px 12px;font-size:0.75rem">Desmarque um frete j\u00e1 pago ao motorista fora deste fechamento para exclu\u00ed-lo do c\u00e1lculo e do relat\u00f3rio.</div>
+            </div>`;
+    },
+
+    _buildSummaryHtml(c) {
+        return `<div class="closing-summary" style="margin-top:20px" id="dc-summary-wrap">
+            <div class="closing-item"><div class="closing-label">KM Carregado</div><div class="closing-value">${Utils.formatNumber(c.totalKmCarregado)}</div></div>
+            <div class="closing-item"><div class="closing-label">KM Vazio</div><div class="closing-value">${Utils.formatNumber(c.totalKmVazio)}</div></div>
+            <div class="closing-item"><div class="closing-label">Total Litros</div><div class="closing-value" id="closing-total-litros">${Utils.formatNumber(c.totalLitros, 1)}</div></div>
+            <div class="closing-item"><div class="closing-label">M\u00e9dia km/L</div><div class="closing-value" id="closing-media-kml">${c.mediaKmL.toFixed(2)}</div></div>
+        </div>`;
+    },
+
+    toggleAllFreights(checked) {
+        document.querySelectorAll('.dc-freight-check').forEach(cb => {
+            cb.checked = checked;
+            const row = cb.closest('tr');
+            if (row) row.style.opacity = checked ? '1' : '0.5';
+        });
+        this.recalcFromSelection();
+    },
+
+    recalcFromSelection() {
+        const closing = this._lastClosing;
+        if (!closing) return;
+
+        const excluded = new Set();
+        document.querySelectorAll('.dc-freight-check').forEach(cb => {
+            const row = cb.closest('tr');
+            if (!cb.checked) {
+                excluded.add(parseInt(cb.dataset.id));
+                if (row) row.style.opacity = '0.5';
+            } else if (row) {
+                row.style.opacity = '1';
+            }
+        });
+        this._excludedFreightIds = excluded;
+
+        Object.assign(closing, this._computeTotals(closing, excluded));
+        closing.excludedFreightIds = [...excluded];
+
+        const wrap = document.getElementById('dc-composicao-wrap');
+        if (wrap) wrap.outerHTML = this._buildComposicaoHtml(closing);
+
+        const summaryWrap = document.getElementById('dc-summary-wrap');
+        if (summaryWrap) summaryWrap.outerHTML = this._buildSummaryHtml(closing);
+
+        const selectAll = document.getElementById('dc-select-all-freights');
+        if (selectAll) selectAll.checked = excluded.size === 0;
     },
 
     recalcMedia() {
@@ -959,6 +1085,9 @@ Pages.driverClosing = {
         const c = this._lastClosing;
         if (!c) { Utils.showToast('Gere o fechamento primeiro', 'warning'); return; }
 
+        const excludedIds = c.excludedFreightIds || [];
+        const pdfFreights = (c.freights || []).filter(f => !excludedIds.includes(f.id));
+
         const printWindow = window.open('', '_blank');
         printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fechamento ${c.userName} — ${Utils.formatDate(c.dataInicio)} a ${Utils.formatDate(c.dataFim)}</title>
         <style>
@@ -999,7 +1128,7 @@ Pages.driverClosing = {
             <div class="info-row">
                 <div><div class="label">Motorista</div><div class="value">${c.userName}</div></div>
                 <div><div class="label">Caminhão</div><div class="value">${c.placa || '—'}</div></div>
-                <div><div class="label">Fretes no Período</div><div class="value">${c.qtdFretes}</div></div>
+                <div><div class="label">Fretes no Período</div><div class="value">${pdfFreights.length}</div></div>
                 <div><div class="label">Gerado em</div><div class="value">${new Date().toLocaleDateString('pt-BR')}</div></div>
             </div>
 
@@ -1031,7 +1160,7 @@ Pages.driverClosing = {
             <table>
                 <thead><tr><th>Data</th><th>Origem / Destino</th><th>KM</th><th>Tipo</th><th class="text-right">Valor Frete</th></tr></thead>
                 <tbody>
-                    ${c.freights.map(f => `<tr>
+                    ${pdfFreights.map(f => `<tr>
                         <td>${Utils.formatDate(f.data)}</td>
                         <td>${f.origem} <span style="color:#aaa">➝</span> ${f.destino}</td>
                         <td>${Utils.formatNumber(f.km)}</td>

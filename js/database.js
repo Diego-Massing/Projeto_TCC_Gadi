@@ -361,7 +361,7 @@ class FrotaDatabase {
 
     async getDriverForTruck(truckId) {
         const users = await this.getByIndex('users', 'truckId', truckId);
-        return users.find(u => u.role === 'motorista') || null;
+        return users.find(u => u.role === 'motorista' && u.ativo !== false) || null;
     }
 
     async getTruckForDriver(userId) {

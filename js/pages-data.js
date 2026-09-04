@@ -205,7 +205,7 @@ Pages.freights = {
     async render() {
         const trucks = await db.getAll('trucks');
         const freights = await db.getAll('freights');
-        const drivers = (await db.getAll('users')).filter(u => u.role === 'motorista');
+        const drivers = (await db.getAll('users')).filter(u => u.role === 'motorista' && u.ativo !== false);
         const rates = await db.getKmRates();
         freights.sort((a, b) => b.data?.localeCompare(a.data));
         const { mes, ano } = Utils.getCurrentMonth();
@@ -332,7 +332,7 @@ Pages.freights = {
     async applyFilter(useDateRange = false) {
         let freights = await db.getAll('freights');
         const trucks = await db.getAll('trucks');
-        const drivers = (await db.getAll('users')).filter(u => u.role === 'motorista');
+        const drivers = (await db.getAll('users')).filter(u => u.role === 'motorista' && u.ativo !== false);
         // Driver: always filter by their truck
         if (App.userRole === 'motorista' && App.userTruckId) {
             freights = freights.filter(f => f.truckId === App.userTruckId);
@@ -377,9 +377,9 @@ Pages.freights = {
     async showForm(id, presetTruckId) {
         this._driverTouched = false;
         const trucks = await db.getAll('trucks');
-        const drivers = (await db.getAll('users')).filter(u => u.role === 'motorista');
         let item = null;
         if (id) item = await db.getById('freights', id);
+        const drivers = (await db.getAll('users')).filter(u => u.role === 'motorista' && (u.ativo !== false || u.id === item?.userId));
         const currentMod = item?.modalidade || 'kmPlaca';
 
         const isDriverRole = App.userRole === 'motorista';
