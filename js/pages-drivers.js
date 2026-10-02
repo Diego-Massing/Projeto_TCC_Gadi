@@ -470,7 +470,7 @@ Pages.driverClosing = {
         }
 
         try {
-            const result = await db.saveDriverClosing(c);
+            const result = await db.saveDriverClosing({ ...c, snapshot: this._buildSnapshot(c) });
             Utils.showToast(result.replaced ? 'Fechamento atualizado!' : 'Fechamento salvo!', 'success');
             await this.renderSavedClosings(c.userId);
         } catch(e) {
@@ -523,10 +523,43 @@ Pages.driverClosing = {
         }
     },
 
+    // Cópia exata do que aparece no PDF, já sem os itens desmarcados — guardada no fechamento salvo
+    _buildSnapshot(c) {
+        const keep = (items, excluded) => (items || []).filter(i => !(excluded || []).includes(i.id));
+        const pick = (f) => f ? { data: f.data, km: f.km, litros: f.litros } : null;
+        return {
+            userId: c.userId, userName: c.userName, placa: c.placa || null,
+            dataInicio: c.dataInicio, dataFim: c.dataFim,
+            salarioFixo: c.salarioFixo, salarioFixoBase: c.salarioFixoBase,
+            diasTrabalhados: c.diasTrabalhados, diasNoMes: c.diasNoMes,
+            kmCarregado: c.kmCarregado, kmVazio: c.kmVazio,
+            commRates: c.commRates, commRatesIsCustom: c.commRatesIsCustom,
+            pctCarregado: c.pctCarregado, pctVazio: c.pctVazio,
+            comissaoCarregado: c.comissaoCarregado, comissaoVazio: c.comissaoVazio,
+            totalComissaoFechado: c.totalComissaoFechado, kmFreteFechado: c.kmFreteFechado, qtdFreteFechado: c.qtdFreteFechado,
+            totalLitros: c.totalLitros, mediaKmL: c.mediaKmL,
+            premioMedia: c.premioMedia, faixaAtingida: c.faixaAtingida || null,
+            premioMediaIncluido: c.premioMediaIncluido !== false,
+            mediaFuelStart: pick(c.mediaFuelStart), mediaFuelEnd: pick(c.mediaFuelEnd),
+            freights: keep(c.freights, c.excludedFreightIds).map(f => ({ id: f.id, data: f.data, origem: f.origem, destino: f.destino, km: f.km, tipo: f.tipo, valorFrete: f.valorFrete })),
+            bonuses: keep(c.bonuses, c.excludedBonusIds).map(b => ({ id: b.id, data: b.data, descricao: b.descricao, valor: b.valor })),
+            expenses: keep(c.expenses, c.excludedExpenseIds).map(e => ({ id: e.id, data: e.data, descricao: e.descricao, valor: e.valor })),
+            discounts: keep(c.discounts, c.excludedDiscountIds).map(d => ({ id: d.id, data: d.data, descricao: d.descricao, valor: d.valor })),
+            totalPagar: c.totalPagar
+        };
+    },
+
     async exportSavedPDF(savedId) {
         const saved = await db.getById('driverClosings', savedId);
         if (!saved) { Utils.showToast('Fechamento não encontrado', 'warning'); return; }
 
+        // Fechamento salvo com snapshot: reexporta exatamente o que foi salvo, sem recalcular
+        if (saved.snapshot) {
+            this.exportPDF(saved.snapshot);
+            return;
+        }
+
+        // Fechamentos antigos (antes da migration 011): recalcula a partir do período
         Utils.showToast('Gerando PDF...', 'info');
         try {
             const closingData = await db.generateDriverClosingByDateRange(
@@ -537,12 +570,10 @@ Pages.driverClosing = {
 
             // Respect the "incluir prêmio de média" choice saved with this fechamento
             const includeMedia = saved.premioMediaIncluido !== false;
-            this._includeMediaPremio = includeMedia;
             closingData.premioMediaIncluido = includeMedia;
             if (!includeMedia) closingData.totalPagar -= (closingData.premioMedia || 0);
 
-            this._lastClosing = closingData;
-            this.exportPDF();
+            this.exportPDF(closingData);
         } catch(e) {
             Utils.showToast('Erro ao gerar PDF: ' + e.message, 'error');
         }
@@ -1119,8 +1150,9 @@ Pages.driverClosing = {
     },
 
     // ===== PDF EXPORT =====
-    exportPDF() {
-        const c = this._lastClosing;
+    exportPDF(closing) {
+        const c = closing || this._lastClosing;
+        const includeMedia = c ? c.premioMediaIncluido !== false : true;
         if (!c) { Utils.showToast('Gere o fechamento primeiro', 'warning'); return; }
 
         const excludedIds = c.excludedFreightIds || [];
@@ -1188,8 +1220,8 @@ Pages.driverClosing = {
                     ${c.comissaoCarregado > 0 ? `<tr><td>Comissão KM Carregado — ${Utils.formatNumber(c.kmCarregado)} km × ${Utils.formatCurrency(c.commRates.carregado)}/km × ${c.pctCarregado}%${c.commRatesIsCustom ? ' (taxa própria do motorista)' : ' (taxa da placa/padrão)'}</td><td class="text-right">${Utils.formatCurrency(c.comissaoCarregado)}</td></tr>` : ''}
                     ${c.comissaoVazio > 0 ? `<tr><td>Comissão KM Vazio — ${Utils.formatNumber(c.kmVazio)} km × ${Utils.formatCurrency(c.commRates.vazio)}/km × ${c.pctVazio}%${c.commRatesIsCustom ? ' (taxa própria do motorista)' : ' (taxa da placa/padrão)'}</td><td class="text-right">${Utils.formatCurrency(c.comissaoVazio)}</td></tr>` : ''}
                     ${(c.qtdFreteFechado || 0) > 0 ? `<tr style="background:#f0f0ff"><td>🔒 Fretes Valor Fechado (${c.qtdFreteFechado}x — ${Utils.formatNumber(c.kmFreteFechado)} km) — Comissão</td><td class="text-right"><strong>${Utils.formatCurrency(c.totalComissaoFechado)}</strong></td></tr>` : ''}
-                    ${c.premioMedia > 0 ? `<tr style="background:#f0fff0"><td><strong>Prêmio Média km/L</strong> — Média atual: <strong>${c.mediaKmL} km/L</strong>${c.mediaFuelStart && c.mediaFuelEnd ? `<br><small style="color:#888">Abastecidas consideradas: ${Utils.formatDate(c.mediaFuelStart.data)} a ${Utils.formatDate(c.mediaFuelEnd.data)}</small>` : ''}${this._includeMediaPremio === false ? '<br><small style="color:#b91c1c">Não incluído neste acerto</small>' : ''}</td><td class="text-right" style="${this._includeMediaPremio === false ? 'text-decoration:line-through;color:#999' : ''}"><strong>${Utils.formatCurrency(c.premioMedia)}</strong></td></tr>` : ''}
-                    ${c.faixaAtingida && this._includeMediaPremio !== false ? `<tr><td style="padding-left:24px;color:#666">✅ Faixa ${c.faixaAtingida.minMedia} km/L — <strong>APLICADO</strong></td><td class="text-right" style="font-size:11px">${Utils.formatCurrency(c.faixaAtingida.premio)}</td></tr>` : ''}
+                    ${c.premioMedia > 0 ? `<tr style="background:#f0fff0"><td><strong>Prêmio Média km/L</strong> — Média atual: <strong>${c.mediaKmL} km/L</strong>${c.mediaFuelStart && c.mediaFuelEnd ? `<br><small style="color:#888">Abastecidas consideradas: ${Utils.formatDate(c.mediaFuelStart.data)} a ${Utils.formatDate(c.mediaFuelEnd.data)}</small>` : ''}${includeMedia === false ? '<br><small style="color:#b91c1c">Não incluído neste acerto</small>' : ''}</td><td class="text-right" style="${includeMedia === false ? 'text-decoration:line-through;color:#999' : ''}"><strong>${Utils.formatCurrency(c.premioMedia)}</strong></td></tr>` : ''}
+                    ${c.faixaAtingida && includeMedia !== false ? `<tr><td style="padding-left:24px;color:#666">✅ Faixa ${c.faixaAtingida.minMedia} km/L — <strong>APLICADO</strong></td><td class="text-right" style="font-size:11px">${Utils.formatCurrency(c.faixaAtingida.premio)}</td></tr>` : ''}
                     ${pdfBonuses.map(b => `<tr><td>Prêmio: ${b.descricao} (${Utils.formatDate(b.data)})</td><td class="text-right">${Utils.formatCurrency(b.valor)}</td></tr>`).join('')}
                     ${pdfExpenses.map(e => `<tr><td>Reembolso: ${e.descricao} (${Utils.formatDate(e.data)})</td><td class="text-right">${Utils.formatCurrency(e.valor)}</td></tr>`).join('')}
                     ${pdfDiscounts.map(d => `<tr style="color:#b91c1c"><td>${d.descricao || 'Vale'} (${Utils.formatDate(d.data)})</td><td class="text-right">-${Utils.formatCurrency(d.valor)}</td></tr>`).join('')}

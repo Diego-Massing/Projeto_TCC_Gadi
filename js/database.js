@@ -405,6 +405,7 @@ class FrotaDatabase {
             totalPagar: closingData.totalPagar || 0,
             totalSemVales,
             premioMediaIncluido: closingData.premioMediaIncluido !== false,
+            snapshot: closingData.snapshot || null,
             geradoEm: new Date().toISOString()
         };
 
