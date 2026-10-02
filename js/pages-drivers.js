@@ -584,7 +584,7 @@ Pages.driverClosing = {
         document.getElementById('dc-discounts-list').innerHTML = discHtml;
     },
 
-    async generate() {
+    async generate(preserveSelection = false) {
         const userId = parseInt(document.getElementById('dc-driver').value);
         if (!userId) { Utils.showToast('Selecione um motorista', 'warning'); return; }
         const dataInicio = document.getElementById('dc-data-inicio').value;
@@ -606,9 +606,15 @@ Pages.driverClosing = {
         const closingData = await db.generateDriverClosingByDateRange(userId, dataInicio, dataFim, diasTrabalhados, diasNoMesOverride);
         if (!closingData) { document.getElementById('driver-closing-result').innerHTML = '<div class="empty-state"><h3>Motorista não encontrado</h3></div>'; return; }
 
-        this._excludedFreightIds = new Set();
+        // Keep the checkbox selection when regenerating the same fechamento (e.g. after adding a vale)
+        const prev = this._lastClosing;
+        const samePeriod = preserveSelection && prev && prev.userId === closingData.userId
+            && prev.dataInicio === closingData.dataInicio && prev.dataFim === closingData.dataFim;
+        if (!samePeriod || !this._excludedFreightIds) this._excludedFreightIds = new Set();
+        if (!samePeriod || !this._excludedItems) this._excludedItems = { expenses: new Set(), bonuses: new Set(), discounts: new Set() };
+
         Object.assign(closingData, this._computeTotals(closingData, this._excludedFreightIds));
-        closingData.excludedFreightIds = [];
+        closingData.excludedFreightIds = [...this._excludedFreightIds];
         closingData.premioMediaIncluido = this._includeMediaPremio;
 
         this._lastClosing = closingData; // Store for PDF
@@ -707,13 +713,24 @@ Pages.driverClosing = {
         const kmFreteFechado = fixedFreights.reduce((s, f) => s + (f.km || 0), 0);
         const qtdFreteFechado = fixedFreights.length;
 
+        // Despesas / prêmios / vales desmarcados (ex.: vale já descontado no mês anterior) ficam fora do total
+        const ex = this._excludedItems || {};
+        const sumIncluded = (items, set) => (items || []).filter(i => !(set && set.has(i.id))).reduce((s, i) => s + (i.valor || 0), 0);
+        const totalExpenses = sumIncluded(c.expenses, ex.expenses);
+        const totalBonuses = sumIncluded(c.bonuses, ex.bonuses);
+        const totalDiscounts = sumIncluded(c.discounts, ex.discounts);
+
         const premioMedia = this._includeMediaPremio ? (c.premioMedia || 0) : 0;
-        const totalPagar = (c.salarioFixo || 0) + totalComissaoKm + totalComissaoFechado + premioMedia + (c.totalExpenses || 0) + (c.totalBonuses || 0) - (c.totalDiscounts || 0);
+        const totalPagar = (c.salarioFixo || 0) + totalComissaoKm + totalComissaoFechado + premioMedia + totalExpenses + totalBonuses - totalDiscounts;
 
         return {
             kmCarregado, kmVazio, totalKmCarregado, totalKmVazio, valorKmCarregado, valorKmVazio,
             comissaoCarregado, comissaoVazio, totalComissaoKm,
             totalComissaoFechado, kmFreteFechado, qtdFreteFechado,
+            totalExpenses, totalBonuses, totalDiscounts,
+            excludedExpenseIds: [...(ex.expenses || [])],
+            excludedBonusIds: [...(ex.bonuses || [])],
+            excludedDiscountIds: [...(ex.discounts || [])],
             totalPagar
         };
     },
@@ -748,13 +765,28 @@ Pages.driverClosing = {
                         <td class="text-right font-bold ${this._includeMediaPremio ? 'text-success' : 'text-muted'}" style="${!this._includeMediaPremio ? 'text-decoration:line-through' : ''}">${Utils.formatCurrency(c.premioMedia)}</td>
                     </tr>` : ''}
                     ${faixasHtml}
-                    ${c.bonuses.map(b => `<tr><td>\ud83c\udf81 ${b.descricao || 'B\u00f4nus'} <small class="text-muted">(${Utils.formatDate(b.data)})</small></td><td class="text-right font-bold text-success">${Utils.formatCurrency(b.valor)}</td></tr>`).join('')}
-                    ${c.expenses.map(e => `<tr><td>\ud83d\udccb Reembolso: ${e.descricao || 'Despesa'} <small class="text-muted">(${Utils.formatDate(e.data)})</small></td><td class="text-right font-bold text-info">${Utils.formatCurrency(e.valor)}</td></tr>`).join('')}
-                    ${c.discounts.map(d => `<tr style="color:var(--accent-danger)"><td>\ud83d\udcb8 ${d.descricao || 'Vale'} <small class="text-muted">(${Utils.formatDate(d.data)})</small></td><td class="text-right font-bold">-${Utils.formatCurrency(d.valor)}</td></tr>`).join('')}
+                    ${c.bonuses.map(b => this._buildItemRowHtml('bonuses', b, `\ud83c\udf81 ${b.descricao || 'B\u00f4nus'}`, Utils.formatCurrency(b.valor), 'text-success')).join('')}
+                    ${c.expenses.map(e => this._buildItemRowHtml('expenses', e, `\ud83d\udccb Reembolso: ${e.descricao || 'Despesa'}`, Utils.formatCurrency(e.valor), 'text-info')).join('')}
+                    ${c.discounts.map(d => this._buildItemRowHtml('discounts', d, `\ud83d\udcb8 ${d.descricao || 'Vale'}`, '-' + Utils.formatCurrency(d.valor), 'text-danger')).join('')}
                 </tbody>
                 <tfoot><tr style="background:rgba(99,102,241,0.1)"><td class="font-bold" style="font-size:1.05rem">TOTAL A PAGAR</td><td class="text-right font-bold ${c.totalPagar >= 0 ? 'text-success' : 'text-danger'}" style="font-size:1.2rem">${Utils.formatCurrency(c.totalPagar)}</td></tr></tfoot>
             </table>
         </div>`;
+    },
+
+    _buildItemRowHtml(kind, item, label, valorFmt, colorClass) {
+        const set = this._excludedItems && this._excludedItems[kind];
+        const checked = !(set && set.has(item.id));
+        return `<tr${checked ? '' : ' style="opacity:0.55"'}>
+            <td>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0">
+                    <input type="checkbox" class="dc-item-check" data-kind="${kind}" data-id="${item.id}" ${checked ? 'checked' : ''} onchange="Pages.driverClosing.recalcFromSelection()">
+                    <span${kind === 'discounts' ? ' style="color:var(--accent-danger)"' : ''}>${label} <small class="text-muted">(${Utils.formatDate(item.data)})</small></span>
+                </label>
+                ${checked ? '' : '<small class="text-muted" style="margin-left:24px">Não incluído neste acerto</small>'}
+            </td>
+            <td class="text-right font-bold ${checked ? colorClass : 'text-muted'}" style="${checked ? '' : 'text-decoration:line-through'}">${valorFmt}</td>
+        </tr>`;
     },
 
     _buildRoutesTableHtml(freights, excludedIds) {
@@ -816,6 +848,12 @@ Pages.driverClosing = {
             }
         });
         this._excludedFreightIds = excluded;
+
+        const excludedItems = { expenses: new Set(), bonuses: new Set(), discounts: new Set() };
+        document.querySelectorAll('.dc-item-check').forEach(cb => {
+            if (!cb.checked) excludedItems[cb.dataset.kind].add(parseInt(cb.dataset.id));
+        });
+        this._excludedItems = excludedItems;
 
         Object.assign(closing, this._computeTotals(closing, excluded));
         closing.excludedFreightIds = [...excluded];
@@ -1076,7 +1114,7 @@ Pages.driverClosing = {
         await this.loadManagementData(userId, dataInicio, dataFim);
         // If result is already showing, regenerate it too to keep numbers consistent
         if (document.getElementById('driver-closing-result').innerHTML !== '') {
-            this.generate();
+            this.generate(true);
         }
     },
 
@@ -1087,6 +1125,9 @@ Pages.driverClosing = {
 
         const excludedIds = c.excludedFreightIds || [];
         const pdfFreights = (c.freights || []).filter(f => !excludedIds.includes(f.id));
+        const pdfBonuses = (c.bonuses || []).filter(b => !(c.excludedBonusIds || []).includes(b.id));
+        const pdfExpenses = (c.expenses || []).filter(e => !(c.excludedExpenseIds || []).includes(e.id));
+        const pdfDiscounts = (c.discounts || []).filter(d => !(c.excludedDiscountIds || []).includes(d.id));
 
         const printWindow = window.open('', '_blank');
         printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fechamento ${c.userName} — ${Utils.formatDate(c.dataInicio)} a ${Utils.formatDate(c.dataFim)}</title>
@@ -1149,9 +1190,9 @@ Pages.driverClosing = {
                     ${(c.qtdFreteFechado || 0) > 0 ? `<tr style="background:#f0f0ff"><td>🔒 Fretes Valor Fechado (${c.qtdFreteFechado}x — ${Utils.formatNumber(c.kmFreteFechado)} km) — Comissão</td><td class="text-right"><strong>${Utils.formatCurrency(c.totalComissaoFechado)}</strong></td></tr>` : ''}
                     ${c.premioMedia > 0 ? `<tr style="background:#f0fff0"><td><strong>Prêmio Média km/L</strong> — Média atual: <strong>${c.mediaKmL} km/L</strong>${c.mediaFuelStart && c.mediaFuelEnd ? `<br><small style="color:#888">Abastecidas consideradas: ${Utils.formatDate(c.mediaFuelStart.data)} a ${Utils.formatDate(c.mediaFuelEnd.data)}</small>` : ''}${this._includeMediaPremio === false ? '<br><small style="color:#b91c1c">Não incluído neste acerto</small>' : ''}</td><td class="text-right" style="${this._includeMediaPremio === false ? 'text-decoration:line-through;color:#999' : ''}"><strong>${Utils.formatCurrency(c.premioMedia)}</strong></td></tr>` : ''}
                     ${c.faixaAtingida && this._includeMediaPremio !== false ? `<tr><td style="padding-left:24px;color:#666">✅ Faixa ${c.faixaAtingida.minMedia} km/L — <strong>APLICADO</strong></td><td class="text-right" style="font-size:11px">${Utils.formatCurrency(c.faixaAtingida.premio)}</td></tr>` : ''}
-                    ${c.bonuses.map(b => `<tr><td>Prêmio: ${b.descricao} (${Utils.formatDate(b.data)})</td><td class="text-right">${Utils.formatCurrency(b.valor)}</td></tr>`).join('')}
-                    ${c.expenses.map(e => `<tr><td>Reembolso: ${e.descricao} (${Utils.formatDate(e.data)})</td><td class="text-right">${Utils.formatCurrency(e.valor)}</td></tr>`).join('')}
-                    ${c.discounts.map(d => `<tr style="color:#b91c1c"><td>${d.descricao || 'Vale'} (${Utils.formatDate(d.data)})</td><td class="text-right">-${Utils.formatCurrency(d.valor)}</td></tr>`).join('')}
+                    ${pdfBonuses.map(b => `<tr><td>Prêmio: ${b.descricao} (${Utils.formatDate(b.data)})</td><td class="text-right">${Utils.formatCurrency(b.valor)}</td></tr>`).join('')}
+                    ${pdfExpenses.map(e => `<tr><td>Reembolso: ${e.descricao} (${Utils.formatDate(e.data)})</td><td class="text-right">${Utils.formatCurrency(e.valor)}</td></tr>`).join('')}
+                    ${pdfDiscounts.map(d => `<tr style="color:#b91c1c"><td>${d.descricao || 'Vale'} (${Utils.formatDate(d.data)})</td><td class="text-right">-${Utils.formatCurrency(d.valor)}</td></tr>`).join('')}
                     <tr class="total-row"><td>TOTAL A PAGAR</td><td class="text-right">${Utils.formatCurrency(c.totalPagar)}</td></tr>
                 </tbody>
             </table>
