@@ -1,19 +1,21 @@
 // ===== UTILITY MODULE =====
 
 const Utils = {
+    // Chronological order for fuelings: by date; same date by km only when BOTH have
+    // it. A missing km defaults to 0 and would otherwise always sort before same-day
+    // entries that do have km, even when it was fueled later that day — fall back to
+    // id (insertion order) so it lands in its real position instead.
+    fuelCompare(a, b) {
+        const dateCmp = (a.data || '').localeCompare(b.data || '');
+        if (dateCmp !== 0) return dateCmp;
+        if (a.km > 0 && b.km > 0 && a.km !== b.km) return a.km - b.km;
+        return (a.id || 0) - (b.id || 0);
+    },
+
     // All fuelings (excl. Arla) sorted by date/km — used both as the full timeline for
     // litros sums and as the base list from which anchors (entries with km) are derived.
     fuelSorted(fuelings) {
-        return (fuelings || []).filter(f => f.tipoComb !== 'Arla').sort((a, b) => {
-            const dateCmp = (a.data || '').localeCompare(b.data || '');
-            if (dateCmp !== 0) return dateCmp;
-            // Same date: order by km only when BOTH have it. A missing km defaults
-            // to 0 and would otherwise always sort before same-day entries that do
-            // have km, even when it was fueled later that day — fall back to id
-            // (insertion order) so it lands in its real position instead.
-            if (a.km > 0 && b.km > 0) return a.km - b.km;
-            return (a.id || 0) - (b.id || 0);
-        });
+        return (fuelings || []).filter(f => f.tipoComb !== 'Arla').sort((a, b) => this.fuelCompare(a, b));
     },
 
     // Entries usable as range boundaries for the média km/L calc — need a km value to

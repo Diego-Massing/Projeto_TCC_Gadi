@@ -3,7 +3,7 @@ Pages.fuelings = {
     async render() {
         const trucks = await db.getAll('trucks');
         let fuelings = await db.getAll('fuelings');
-        fuelings.sort((a, b) => b.data?.localeCompare(a.data));
+        fuelings.sort((a, b) => Utils.fuelCompare(b, a));
         const isDriver = App.userRole === 'motorista';
         const isViewer = App.userRole === 'visualizador';
 
@@ -62,7 +62,7 @@ Pages.fuelings = {
         const to = document.getElementById('filter-fuel-to')?.value;
         if (from) fuelings = fuelings.filter(f => f.data >= from);
         if (to) fuelings = fuelings.filter(f => f.data <= to);
-        fuelings.sort((a, b) => b.data?.localeCompare(a.data));
+        fuelings.sort((a, b) => Utils.fuelCompare(b, a));
         document.getElementById('fuelings-table').innerHTML = this.renderTable(fuelings, trucks);
     },
 

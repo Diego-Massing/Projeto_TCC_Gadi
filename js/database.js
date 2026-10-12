@@ -158,6 +158,11 @@ class FrotaDatabase {
 
         const { data, error } = await supabase.from(table).select('*');
         if (error) { console.error(`Error getting all ${storeName}:`, error); return []; }
+        // Stable alphabetical order for lists and dropdowns — Postgres returns rows in
+        // arbitrary (update-dependent) order otherwise. Users: admins first.
+        const byText = (a, b) => (a || '').localeCompare(b || '', 'pt-BR', { sensitivity: 'base', numeric: true });
+        if (storeName === 'trucks') data.sort((a, b) => byText(a.placa, b.placa));
+        if (storeName === 'users') data.sort((a, b) => ((a.role !== 'admin') - (b.role !== 'admin')) || byText(a.nome, b.nome));
         return data;
     }
 

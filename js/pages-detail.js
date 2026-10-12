@@ -101,7 +101,7 @@ Pages.truckDetail = {
     renderFuelTab(fuelings) {
         return `<div class="d-flex justify-between align-center mb-2"><h3>Abastecimentos</h3><button class="btn btn-primary btn-sm" onclick="Pages.fuelings.showForm(null,${this.truckId})">＋ Novo</button></div>
         ${fuelings.length === 0 ? '<div class="empty-state"><div class="empty-icon">⛽</div><h3>Nenhum abastecimento</h3></div>' :
-                `<div class="table-container"><table class="data-table"><thead><tr><th>Data</th><th>Posto</th><th>Litros</th><th>R$/L</th><th>KM</th><th>Total</th><th>Tipo</th><th></th></tr></thead><tbody>${fuelings.sort((a, b) => b.data?.localeCompare(a.data)).map(f => `<tr>
+                `<div class="table-container"><table class="data-table"><thead><tr><th>Data</th><th>Posto</th><th>Litros</th><th>R$/L</th><th>KM</th><th>Total</th><th>Tipo</th><th></th></tr></thead><tbody>${fuelings.sort((a, b) => Utils.fuelCompare(b, a)).map(f => `<tr>
                 <td>${Utils.formatDate(f.data)}</td><td>${f.posto || '—'}</td><td>${Utils.formatNumber(f.litros, 2)}</td><td>${Utils.formatCurrency(f.valorLitro)}</td>
                 <td>${Utils.formatNumber(f.km)}</td><td class="font-bold">${Utils.formatCurrency(f.valorTotal)}</td><td><span class="badge badge-info">${f.tipoComb || 'Diesel'}</span></td>
                 <td><button class="btn btn-icon btn-secondary btn-sm" onclick="Pages.fuelings.showForm(${f.id},${f.truckId})">✏️</button> <button class="btn btn-icon btn-sm" style="color:var(--accent-danger)" onclick="Pages.fuelings.remove(${f.id})">🗑️</button></td>
