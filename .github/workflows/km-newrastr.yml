@@ -26,6 +26,12 @@ jobs:
       run:
         working-directory: tools/km-newrastr
     steps:
+      - name: Diagnóstico de rede
+        working-directory: .
+        run: |
+          echo "IP/país do runner: $(curl -s --max-time 10 https://ipinfo.io/country) $(curl -s --max-time 10 https://ipinfo.io/region)"
+          curl -sS -o /dev/null --max-time 30 -w "newrastreamentoonline.com.br → HTTP %{http_code} em %{time_total}s\n" https://newrastreamentoonline.com.br/new/login || echo "newrastreamentoonline.com.br → sem resposta em 30s"
+          curl -sS -o /dev/null --max-time 30 -w "google.com → HTTP %{http_code} em %{time_total}s\n" https://www.google.com || true
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
