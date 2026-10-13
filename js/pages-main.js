@@ -36,11 +36,29 @@ Pages.dashboard = {
                     <div class="form-group"><label class="form-label">M\u00eas</label><select class="form-control" id="dash-mes" onchange="Pages.dashboard.applyDashboardFilter()">${Array.from({ length: 12 }, (_, i) => '<option value="' + (i + 1) + '"' + (i + 1 === mes ? ' selected' : '') + '>' + Utils.getMonthName(i + 1) + '</option>').join('')}</select></div>
                     <div class="form-group"><label class="form-label">Ano</label><input type="number" class="form-control" id="dash-ano" value="${ano}" style="width:100px" onchange="Pages.dashboard.applyDashboardFilter()"></div>
                 </div>
+                <div id="dash-nfe"></div>
                 <div id="dash-alerts"></div>
                 <div id="dash-content"></div>
             </div>`;
 
         this.applyDashboardFilter();
+        this.renderNfeNotice();
+    },
+
+    // Aviso de NF-e que chegaram por e-mail e ainda não foram conferidas (só admin).
+    async renderNfeNotice() {
+        if (App.userRole !== 'admin') return;
+        const { count, error } = await supabase.from('nfe_inbox').select('id', { count: 'exact', head: true }).eq('status', 'pendente');
+        const el = document.getElementById('dash-nfe');
+        if (error || !count || !el) return;
+        el.innerHTML = `
+            <div class="card mb-3" style="border:1px solid var(--accent-info); background:rgba(59, 130, 246, 0.05)">
+                <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap">
+                    <div><strong style="color:var(--accent-info)">🧾 ${count} nota${count > 1 ? 's' : ''} de abastecimento para conferir</strong>
+                        <div class="text-muted" style="font-size:.85rem">Chegaram por e-mail do posto e ainda não foram aprovadas nem ignoradas.</div></div>
+                    <button class="btn btn-primary btn-sm" onclick="App.navigate('nfe')">Conferir notas</button>
+                </div>
+            </div>`;
     },
 
     applyDashboardFilter() {
