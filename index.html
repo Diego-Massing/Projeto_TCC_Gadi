@@ -211,6 +211,9 @@
                 </div>
                 <div class="nav-section">
                     <div class="nav-section-title">Sistema</div>
+                    <button class="nav-item" data-page="nfe" data-roles="admin">
+                        <span class="nav-icon">🧾</span> Notas Recebidas
+                    </button>
                     <button class="nav-item" data-page="import" data-roles="admin">
                         <span class="nav-icon">📤</span> Importar Dados
                     </button>
@@ -257,7 +260,7 @@
         const _scripts = [
             'js/supabase-config.js', 'js/database.js', 'js/utils.js', 'js/charts.js', 'js/maps.js',
             'js/pages-main.js', 'js/pages-detail.js', 'js/pages-data.js', 'js/pages-extra.js',
-            'js/pages-drivers.js', 'js/app.js'
+            'js/pages-drivers.js', 'js/pages-nfe.js', 'js/app.js'
         ];
         _scripts.forEach(src => { document.write(`<script src="${src}?v=${_v}"><\/script>`); });
     </script>
