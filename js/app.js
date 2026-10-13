@@ -253,8 +253,8 @@ const App = {
     // Check if current user can access a page
     canAccess(page) {
         const access = {
-            admin: ['dashboard', 'trucks', 'truck-detail', 'fuelings', 'truck-expenses', 'freights', 'fines', 'users', 'driver-closing', 'closing', 'import', 'settings', 'tires-analytics', 'miro', 'km-report', 'nfe'],
-            visualizador: ['dashboard', 'trucks', 'truck-detail', 'fuelings', 'truck-expenses', 'freights', 'fines', 'users', 'driver-closing', 'closing', 'tires-analytics', 'miro', 'km-report'],
+            admin: ['dashboard', 'trucks', 'truck-detail', 'fuelings', 'truck-expenses', 'freights', 'fines', 'users', 'driver-closing', 'closing', 'import', 'settings', 'tires-analytics', 'miro', 'km-report', 'medias', 'nfe'],
+            visualizador: ['dashboard', 'trucks', 'truck-detail', 'fuelings', 'truck-expenses', 'freights', 'fines', 'users', 'driver-closing', 'closing', 'tires-analytics', 'miro', 'km-report', 'medias'],
             motorista: ['fuelings', 'freights']
         };
         return (access[this.userRole] || access.admin).includes(page);
@@ -308,6 +308,7 @@ const App = {
             case 'closing': await Pages.monthlyClosing.render(); break;
             case 'tires-analytics': await Pages.tiresAnalytics.render(); break;
             case 'km-report': await Pages.kmReport.render(); break;
+            case 'medias': await Pages.medias.render(); break;
             case 'nfe': await Pages.nfe.render(); break;
             case 'import': await Pages.dataImport.render(); break;
             case 'settings': await Pages.settings.render(); break;
