@@ -20,8 +20,11 @@ function exigir(nome) {
 }
 
 async function login(page) {
-  await page.goto(`${BASE}/new/login`, { waitUntil: "networkidle" });
-  await page.waitForSelector("#txtEmail_I", { timeout: 30000 });
+  // "networkidle" nunca chega: o portal fica fazendo chamadas de fundo o tempo todo.
+  const resp = await page.goto(`${BASE}/new/login`, { waitUntil: "domcontentloaded", timeout: 60000 });
+  console.log("Página de login:", resp?.status(), new URL(page.url()).pathname, "-", await page.title());
+  await page.waitForSelector("#txtEmail_I", { timeout: 45000 });
+  await page.waitForFunction(() => typeof txtEmail !== "undefined" && typeof ASPx !== "undefined", null, { timeout: 30000 });
 
   const captcha = await page.evaluate(() =>
     typeof panCaptcha !== "undefined" && panCaptcha.GetClientVisible());
