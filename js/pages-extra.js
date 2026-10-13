@@ -114,7 +114,7 @@ Pages.kmReport = {
 
         document.getElementById('page-content').innerHTML = `
             <div class="page-header"><div class="page-header-row">
-                <div><h1 class="page-title">🛣️ KM Rodado (Sascar)</h1><p class="page-subtitle">Consulta o hodômetro da Sascar/Michelin para calcular o KM rodado por caminhão num período</p></div>
+                <div><h1 class="page-title">🛣️ KM Rodado</h1><p class="page-subtitle">Consulta os rastreadores (Sascar/Michelin e Getrak) para calcular o KM rodado por caminhão num período</p></div>
                 <button class="btn btn-secondary" onclick="Pages.kmReport.syncNow()" id="km-sync-btn">🔄 Atualizar KM agora</button>
             </div></div>
             <div class="page-body">
@@ -194,7 +194,7 @@ Pages.kmReport = {
             resultEl.innerHTML = `
                 <div class="card"><div class="card-body text-center">
                     <div class="spinner" style="margin-bottom:10px"></div>
-                    <p class="text-muted" style="margin-bottom:10px">Consultando Sascar — 1 login + 1 chamada por caminhão (${trucks.length} caminhões). Pode levar até ${Math.max(40, trucks.length * 5)}s...</p>
+                    <p class="text-muted" style="margin-bottom:10px">Consultando os rastreadores — 1 chamada por caminhão (${trucks.length} caminhões). Pode levar até ${Math.max(40, trucks.length * 5)}s...</p>
                     <div class="progress-bar-track" style="max-width:400px;margin:0 auto"></div>
                     <p class="text-muted" style="margin-top:8px;font-size:0.78rem">${secs}s</p>
                 </div></div>`;
@@ -203,41 +203,88 @@ Pages.kmReport = {
         const timer = setInterval(renderLoading, 1000);
 
         try {
-            const { data, error } = await supabase.functions.invoke('sascar-km-report', { body: { dateFrom, dateTo } });
+            const [{ data, error }, estimativas] = await Promise.all([
+                supabase.functions.invoke('sascar-km-report', { body: { dateFrom, dateTo } }),
+                this.estimarPorAbastecidas(dateFrom, dateTo)
+            ]);
             if (error) throw error;
+            for (const r of data.resultados || []) r.estimado = estimativas[r.truckId] || null;
             this.lastResult = data;
             resultEl.innerHTML = this.renderResult(data);
         } catch (e) {
             console.error('sascar-km-report error:', e);
-            resultEl.innerHTML = `<div class="card"><div class="card-body text-center" style="color:var(--accent-danger)">Erro ao consultar: ${e.message || 'falha na integração Sascar'}</div></div>`;
+            resultEl.innerHTML = `<div class="card"><div class="card-body text-center" style="color:var(--accent-danger)">Erro ao consultar: ${e.message || 'falha na integração com os rastreadores'}</div></div>`;
         } finally {
             clearInterval(timer);
             this.setFilterButtonsDisabled(false);
         }
     },
 
+    // KM rodado pelo KM das abastecidas: da última abastecida antes do período até a
+    // última dentro dele. Não bate com as datas exatas do período (depende de quando o
+    // caminhão abasteceu), por isso aparece como estimativa — serve para caminhões sem
+    // rastreador e para conferir o rastreador (e KM digitado errado nas notas).
+    async estimarPorAbastecidas(dateFrom, dateTo) {
+        const desde = new Date(dateFrom + 'T00:00:00');
+        desde.setDate(desde.getDate() - 60);
+        const { data, error } = await supabase.from('fuelings')
+            .select('id, "truckId", data, km, "tipoComb"')
+            .gte('data', desde.toISOString().slice(0, 10)).lte('data', dateTo).gt('km', 0);
+        if (error) { console.error('estimarPorAbastecidas:', error); return {}; }
+        const porCaminhao = {};
+        for (const f of data) (porCaminhao[f.truckId] ||= []).push(f);
+        const out = {};
+        for (const [truckId, list] of Object.entries(porCaminhao)) {
+            const sorted = Utils.fuelSorted(list);
+            const dentro = sorted.filter(f => f.data >= dateFrom);
+            if (!dentro.length) continue;
+            const antes = sorted.filter(f => f.data < dateFrom).pop();
+            const ini = antes || dentro[0], fim = dentro[dentro.length - 1];
+            if (fim === ini || fim.km <= ini.km) continue;
+            out[truckId] = { kmInicio: ini.km, kmFim: fim.km, kmRodado: fim.km - ini.km, de: ini.data, ate: fim.data };
+        }
+        return out;
+    },
+
     renderResult(data) {
         const rows = data.resultados || [];
+        const dm = d => Utils.formatDate(d).slice(0, 5);
+        const total = rows.reduce((s, r) => s + (r.kmRodado ?? r.estimado?.kmRodado ?? 0), 0);
+        const usouEstimativa = rows.some(r => r.kmRodado == null && r.estimado);
         return `
             <div class="stats-grid animate-in" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr))">
                 <div class="stat-card" style="--stat-accent: var(--gradient-primary)">
                     <div class="stat-icon">🛣️</div>
-                    <div class="stat-value">${Utils.formatNumber(data.total, 1)}</div>
-                    <div class="stat-label">Total KM rodado (${Utils.formatDate(data.dateFrom)} — ${Utils.formatDate(data.dateTo)})</div>
+                    <div class="stat-value">${Utils.formatNumber(total, 1)}</div>
+                    <div class="stat-label">Total KM rodado (${Utils.formatDate(data.dateFrom)} — ${Utils.formatDate(data.dateTo)})${usouEstimativa ? ' — inclui estimativas pelas abastecidas' : ''}</div>
                 </div>
             </div>
             <div class="table-container"><table class="data-table">
-                <thead><tr><th>Placa</th><th>KM Início</th><th>KM Fim</th><th>KM Rodado</th></tr></thead>
-                <tbody>${rows.map(r => `<tr>
-                    <td class="font-mono font-bold">${r.placa}</td>
-                    <td>${r.kmInicio != null ? Utils.formatNumber(r.kmInicio, 1) : '—'}</td>
-                    <td>${r.kmFim != null ? Utils.formatNumber(r.kmFim, 1) : '—'}</td>
-                    <td class="${r.kmRodado != null ? 'font-bold text-success' : 'text-muted'}">${r.kmRodado != null ? Utils.formatNumber(r.kmRodado, 1) + ' KM' : (r.erro || '—')}</td>
-                </tr>`).join('')}</tbody>
+                <thead><tr><th>Placa</th><th>Rastreador</th><th>KM Início</th><th>KM Fim</th><th>KM Rodado</th><th>Pelas abastecidas</th></tr></thead>
+                <tbody>${rows.map(r => {
+                    const e = r.estimado;
+                    const usaEst = r.kmRodado == null && e;
+                    const ini = r.kmInicio ?? (usaEst ? e.kmInicio : null);
+                    const fim = r.kmFim ?? (usaEst ? e.kmFim : null);
+                    // Rastreador parado (0 km) mas as abastecidas mostram o caminhão andando.
+                    const travado = r.kmRodado === 0 && e && e.kmRodado > 0;
+                    let rodado;
+                    if (r.kmRodado != null) rodado = `<span class="font-bold text-success">${Utils.formatNumber(r.kmRodado, 1)} KM</span>`;
+                    else if (usaEst) rodado = `<span class="font-bold" style="color:var(--accent-warning)">${Utils.formatNumber(e.kmRodado)} KM</span> <span class="badge badge-warning" style="font-size:0.65rem">estimado</span><div style="font-size:0.7rem;color:var(--text-secondary)">${r.erro || 'sem rastreador'}</div>`;
+                    else rodado = `<span class="text-muted">${r.erro || '—'}</span>`;
+                    if (travado) rodado += `<div style="font-size:0.7rem;color:var(--accent-danger)">⚠️ rastreador sem atualização? As abastecidas mostram ${Utils.formatNumber(e.kmRodado)} km</div>`;
+                    return `<tr>
+                        <td class="font-mono font-bold">${r.placa}</td>
+                        <td>${r.fonte ? `<span class="badge badge-info">${r.fonte}</span>` : (usaEst ? '<span class="badge badge-warning">Abastecidas</span>' : '—')}</td>
+                        <td>${ini != null ? Utils.formatNumber(ini, 1) : '—'}</td>
+                        <td>${fim != null ? Utils.formatNumber(fim, 1) : '—'}</td>
+                        <td>${rodado}</td>
+                        <td style="font-size:0.8rem">${e ? `${Utils.formatNumber(e.kmRodado)} km <span class="text-muted">(${dm(e.de)} → ${dm(e.ate)})</span>` : '<span class="text-muted">—</span>'}</td>
+                    </tr>`;
+                }).join('')}</tbody>
             </table></div>`;
     }
 };
-
 // ===== FINES PAGE =====
 Pages.fines = {
     async render() {
