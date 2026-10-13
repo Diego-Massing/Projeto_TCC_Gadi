@@ -18,3 +18,8 @@ Thumbs.db
 
 # Dependências das ferramentas (tools/*)
 node_modules/
+
+# Configuração local com credenciais (tools/*/.env) — nunca versionar
+.env
+# Registro das execuções do coletor de KM
+tools/km-newrastr/*.log

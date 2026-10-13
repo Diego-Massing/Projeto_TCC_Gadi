@@ -114,7 +114,7 @@ Pages.kmReport = {
 
         document.getElementById('page-content').innerHTML = `
             <div class="page-header"><div class="page-header-row">
-                <div><h1 class="page-title">🛣️ KM Rodado</h1><p class="page-subtitle">Consulta os rastreadores (Sascar/Michelin e Getrak) para calcular o KM rodado por caminhão num período</p></div>
+                <div><h1 class="page-title">🛣️ KM Rodado</h1><p class="page-subtitle">Consulta os rastreadores (Sascar/Michelin, Getrak e New Rastreamento) para calcular o KM rodado por caminhão num período</p></div>
                 <button class="btn btn-secondary" onclick="Pages.kmReport.syncNow()" id="km-sync-btn">🔄 Atualizar KM agora</button>
             </div></div>
             <div class="page-body">
@@ -269,7 +269,7 @@ Pages.kmReport = {
                     // Rastreador parado (0 km) mas as abastecidas mostram o caminhão andando.
                     const travado = r.kmRodado === 0 && e && e.kmRodado > 0;
                     let rodado;
-                    if (r.kmRodado != null) rodado = `<span class="font-bold text-success">${Utils.formatNumber(r.kmRodado, 1)} KM</span>`;
+                    if (r.kmRodado != null) rodado = `<span class="font-bold text-success">${Utils.formatNumber(r.kmRodado, 1)} KM</span>${r.nota ? `<div style="font-size:0.7rem;color:${/só até/.test(r.nota) ? 'var(--accent-warning)' : 'var(--text-secondary)'}">${r.nota}</div>` : ''}`;
                     else if (usaEst) rodado = `<span class="font-bold" style="color:var(--accent-warning)">${Utils.formatNumber(e.kmRodado)} KM</span> <span class="badge badge-warning" style="font-size:0.65rem">estimado</span><div style="font-size:0.7rem;color:var(--text-secondary)">${r.erro || 'sem rastreador'}</div>`;
                     else rodado = `<span class="text-muted">${r.erro || '—'}</span>`;
                     if (travado) rodado += `<div style="font-size:0.7rem;color:var(--accent-danger)">⚠️ rastreador sem atualização? As abastecidas mostram ${Utils.formatNumber(e.kmRodado)} km</div>`;

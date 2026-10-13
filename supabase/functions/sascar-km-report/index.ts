@@ -5,7 +5,8 @@ import { getrakKmForRange, getrakLogin, listGetrakVehicles, placaMercosul } from
 
 // KM rodado por caminhão num período, juntando os rastreadores da frota:
 // Getrak (quem estiver lá tem prioridade — caminhões que saíram da Sascar às vezes
-// continuam listados nela com dado velho) e Sascar/Michelin para os demais.
+// continuam listados nela com dado velho), Sascar/Michelin, e por último o KM por dia
+// do New Rastreamento que o PC do admin grava em km_diario.
 // Cada rastreador falha sozinho: se um login cair, os caminhões dele saem com erro
 // e os do outro continuam.
 Deno.serve(async (req: Request) => {
@@ -62,6 +63,28 @@ Deno.serve(async (req: Request) => {
       sascarErro = e instanceof Error ? e.message : String(e);
     }
 
+    // KM por dia gravado pelo programa do PC (tools/km-newrastr) para o New Rastreamento,
+    // que não tem API. Soma os dias do período; avisa se faltar dia.
+    const hojeSP = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
+    const ateEsperado = dateTo < hojeSP ? dateTo : hojeSP;
+    const diasEsperados = Math.round((Date.parse(ateEsperado) - Date.parse(dateFrom)) / 86_400_000) + 1;
+    const diario = new Map<string, { km: number; dias: number; ultimo: string; atualizado: string }>();
+    {
+      const { data, error } = await admin.from("km_diario").select("placa, data, km, atualizado_em")
+        .gte("data", dateFrom).lte("data", dateTo);
+      if (error) throw error;
+      for (const d of data ?? []) {
+        const p = placaMercosul(d.placa);
+        const acc = diario.get(p) ?? { km: 0, dias: 0, ultimo: "", atualizado: "" };
+        acc.km += Number(d.km) || 0;
+        acc.dias += 1;
+        if (d.data > acc.ultimo) acc.ultimo = d.data;
+        if (d.atualizado_em > acc.atualizado) acc.atualizado = d.atualizado_em;
+        diario.set(p, acc);
+      }
+    }
+    const fmtBR = (iso: string) => iso.slice(8, 10) + "/" + iso.slice(5, 7);
+
     const dateFromMs = spDayStartMs(dateFrom);
     const dateToMs = spDayEndMs(dateTo);
     const vazio = (truck: any, fonte: string | null, erro: string) =>
@@ -90,6 +113,15 @@ Deno.serve(async (req: Request) => {
             kmInicio: range.kmInicio,
             kmFim: range.kmFim,
             kmRodado: Math.round((range.kmFim - range.kmInicio) * 10) / 10,
+          };
+        }
+        const d = diario.get(placa);
+        if (d) {
+          const atualizado = new Date(d.atualizado).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+          return {
+            truckId: truck.id, placa: truck.placa, fonte: "New Rastreamento",
+            kmInicio: null, kmFim: null, kmRodado: Math.round(d.km * 10) / 10,
+            nota: d.dias < diasEsperados ? `dados só até ${fmtBR(d.ultimo)} (${d.dias} de ${diasEsperados} dias)` : `atualizado em ${atualizado}`,
           };
         }
         const erros = [getrakErro && `Getrak: ${getrakErro}`, sascarErro && `Sascar: ${sascarErro}`].filter(Boolean);
