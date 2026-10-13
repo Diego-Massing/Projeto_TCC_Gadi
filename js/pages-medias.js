@@ -196,9 +196,9 @@ Pages.medias = {
                 }
                 const opcoes = c.anchors.slice(Math.max(0, sg.anchorIdx - this.MAX_OPCOES), sg.anchorIdx).reverse();
                 const auto = sg.modo === 'manual' ? 'Automático' : `Automático (${this.dm(sg.start.data)})`;
-                inicioCell = canEdit ? `<select class="form-control" style="padding:3px 6px;font-size:0.75rem;min-width:160px;${sg.modo === 'manual' ? 'border-color:var(--accent-info)' : ''}" onchange="Pages.medias.setInicio(${t.id}, ${f.id}, this.value)" title="${sg.modo === 'manual' ? 'Início escolhido manualmente' : 'Início automático'}">
+                inicioCell = canEdit ? `<select class="form-control" style="padding:3px 6px;font-size:0.75rem;min-width:200px;${sg.modo === 'manual' ? 'border-color:var(--accent-info)' : ''}" onchange="Pages.medias.setInicio(${t.id}, ${f.id}, this.value)" title="${sg.modo === 'manual' ? 'Início escolhido manualmente' : 'Início automático'}">
                         <option value="" ${sg.modo !== 'manual' ? 'selected' : ''}>${auto}</option>
-                        ${opcoes.map(a => `<option value="${a.id}" ${sg.modo === 'manual' && sg.start.id === a.id ? 'selected' : ''}>${this.dm(a.data)} · ${Utils.formatNumber(a.km)} km</option>`).join('')}
+                        ${opcoes.map(a => `<option value="${a.id}" ${sg.modo === 'manual' && sg.start.id === a.id ? 'selected' : ''}>${this.dm(a.data)} · ${Utils.formatNumber(a.km)} km · ${Utils.formatNumber(a.litros, 1)} L</option>`).join('')}
                     </select>`
                     : `<span style="font-size:0.75rem">${this.dm(sg.start.data)}${sg.modo === 'manual' ? ' (escolhida)' : sg.modo === 'auto' ? ' (auto)' : ''}</span>`;
             } else if (inc) {
