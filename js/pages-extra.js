@@ -312,6 +312,59 @@ Pages.fines = {
 
 // ===== SETTINGS PAGE =====
 Pages.settings = {
+    _backupTables: ['app_users', 'closings', 'driver_bonuses', 'driver_closings', 'driver_discounts',
+        'driver_expenses', 'fines', 'freights', 'fuelings', 'maintenance_plans', 'miro_boletos',
+        'miro_cobrancas', 'nfe_inbox', 'settings', 'tires', 'tires_history', 'truck_closings',
+        'truck_expenses', 'trucks'],
+
+    async exportBackup() {
+        const btn = document.getElementById('btn-backup');
+        btn.disabled = true; btn.textContent = '⏳ Gerando backup...';
+        try {
+            const tables = {};
+            for (const t of this._backupTables) {
+                const rows = [];
+                // PostgREST devolve no máximo 1000 linhas por requisição
+                for (let from = 0; ; from += 1000) {
+                    const { data, error } = await supabase.from(t).select('*').range(from, from + 999);
+                    if (error) throw new Error(`${t}: ${error.message}`);
+                    rows.push(...data);
+                    if (data.length < 1000) break;
+                }
+                tables[t] = rows;
+            }
+            const now = new Date();
+            const stamp = now.toISOString().slice(0, 10) + '_' + now.toTimeString().slice(0, 5).replace(':', '');
+            const fileName = `backup-frota-${stamp}.json`;
+            const blob = new Blob([JSON.stringify({ geradoEm: now.toISOString(), tabelas: tables }, null, 1)], { type: 'application/json' });
+
+            // Chrome/Edge: deixa escolher a pasta (abre na Área de Trabalho e lembra a última);
+            // outros navegadores: download normal.
+            if (window.showSaveFilePicker) {
+                try {
+                    const handle = await window.showSaveFilePicker({ suggestedName: fileName, startIn: 'desktop', id: 'frota-backup',
+                        types: [{ description: 'Backup Frota Control', accept: { 'application/json': ['.json'] } }] });
+                    const w = await handle.createWritable();
+                    await w.write(blob); await w.close();
+                } catch (e) {
+                    if (e.name === 'AbortError') return; // usuário cancelou
+                    throw e;
+                }
+            } else {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob); a.download = fileName; a.click();
+                setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+            }
+            const total = Object.values(tables).reduce((s, r) => s + r.length, 0);
+            Utils.showToast(`Backup salvo: ${total} registros`, 'success');
+        } catch (e) {
+            console.error(e);
+            Utils.showToast('Erro ao gerar backup: ' + e.message, 'error');
+        } finally {
+            btn.disabled = false; btn.textContent = '💾 Salvar Backup';
+        }
+    },
+
     async render() {
         const rates = await db.getKmRates();
         const comm = await db.getCommissionConfig();
@@ -319,6 +372,10 @@ Pages.settings = {
         document.getElementById('page-content').innerHTML = `
             <div class="page-header"><div class="page-header-row"><div><h1 class="page-title">⚙️ Configurações</h1><p class="page-subtitle">Valores por KM, comissões e integrações</p></div></div></div>
             <div class="page-body">
+                <div class="card mb-3"><div class="card-header"><h3>🗄️ Backup dos Dados</h3></div><div class="card-body">
+                    <p class="text-muted mb-2">Baixa um arquivo com todas as tabelas do sistema (caminhões, abastecimentos, fretes, motoristas, fechamentos...). Recomendado uma vez por semana — guarde na Área de Trabalho ou num pendrive.</p>
+                    <button class="btn btn-primary" id="btn-backup" onclick="Pages.settings.exportBackup()">💾 Salvar Backup</button>
+                </div></div>
                 <div class="card mb-3"><div class="card-header"><h3>💰 Valores por KM Rodado</h3></div><div class="card-body">
                     <p class="text-muted mb-2">Estes valores são usados para calcular automaticamente o valor dos fretes.</p>
                     <div class="form-row">
