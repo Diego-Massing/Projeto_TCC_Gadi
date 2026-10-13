@@ -129,9 +129,10 @@ O sistema foi projetado para transportadoras e gestores de frotas que precisam d
 - Ranking de marcas por durabilidade média (KM rodados por marca)
 - Histórico completo de movimentações por posição e eixo
 
-### 🛣️ KM Rodado (Sascar)
-- Consulta o hodômetro real dos caminhões via integração com a Sascar/Michelin MyConnectedFleet
-- Calcula o KM rodado por caminhão num período (semana/mês, com atalhos de "atual" e "passado(a)")
+### 🛣️ KM Rodado
+- Consulta o hodômetro real dos caminhões nos rastreadores da frota: Sascar/Michelin MyConnectedFleet, Getrak (API v2) e New Rastreamento (lido por `tools/km-newrastr` no PC do admin e gravado por dia em `km_diario`)
+- Calcula o KM rodado por caminhão num período (semana/mês, com atalhos de "atual" e "passado(a)"), mostrando de qual rastreador veio cada caminhão
+- Estimativa pelo KM das abastecidas para todos os caminhões; vira o valor principal quando não há rastreador, e alerta quando o rastreador parece parado
 - Botão "Atualizar KM agora" sincroniza o `kmAtual` de todos os caminhões sob demanda
 - Sincronização automática diária (cron às 03:00) mantém o `kmAtual` sempre atualizado
 - Toda a comunicação com a Sascar roda em Supabase Edge Functions (`supabase/functions/sascar-sync` e `sascar-km-report`); credenciais ficam só no Supabase Vault, nunca no código
@@ -185,16 +186,25 @@ Projeto_TCC_Gadi/
 │   ├── pages-data.js                   # Páginas: Abastecimentos, Fretes, Multas, Despesas
 │   ├── pages-detail.js                 # Página: Detalhes do Caminhão (abas)
 │   ├── pages-drivers.js                # Páginas: Usuários e Comissões
-│   └── pages-extra.js                  # Páginas: Configurações, Pneus, Importação, KM Rodado (Sascar)
+│   ├── pages-extra.js                  # Páginas: Configurações, Pneus, Importação, KM Rodado
+│   ├── pages-medias.js                 # Página: Médias Parciais (km/L por abastecida)
+│   └── pages-nfe.js                    # Página: Notas Recebidas (NF-e dos postos)
 │
-├── supabase/functions/                 # Edge Functions (Deno) — integração Sascar/Michelin
-│   ├── _shared/sascar.ts               # Cliente Sascar: login PKCE, posições, hodômetro
-│   ├── sascar-sync/                    # Atualiza kmAtual dos caminhões (cron diário + botão manual)
-│   └── sascar-km-report/               # Calcula KM rodado por caminhão num período
+├── supabase/
+│   ├── functions/                      # Edge Functions (Deno)
+│   │   ├── _shared/sascar.ts           # Cliente Sascar/Michelin: login PKCE, posições, hodômetro
+│   │   ├── _shared/getrak.ts           # Cliente Getrak (API da plataforma v2)
+│   │   ├── sascar-sync/                # Atualiza kmAtual dos caminhões (cron diário + botão manual)
+│   │   └── sascar-km-report/           # KM rodado por caminhão num período (todos os rastreadores)
+│   └── migrations/                     # Schema inicial + migrações incrementais (.sql)
 │
-├── supabase-schema.sql                 # Schema inicial do banco de dados
-├── supabase-migration-*.sql            # Migrações incrementais
-├── migrate.html                        # Ferramenta de migração IndexedDB → Supabase
+├── tools/                              # Programas auxiliares (fora do site)
+│   ├── gmail-nfe/                      # Google Apps Script: NF-e do Gmail → Supabase
+│   ├── frota-nfe/                      # Consulta de NF-e na SEFAZ com certificado A3 (C#, em pausa)
+│   └── km-newrastr/                    # KM do New Rastreamento (Chrome agendado no PC do admin)
+│
+├── docs/
+│   └── sascar_km_api.md                # Notas técnicas da API da Sascar/Michelin
 └── README.md
 ```
 
@@ -227,18 +237,29 @@ O sistema utiliza **18 tabelas** no PostgreSQL via Supabase, todas com Row-Level
 
 ### Migrações
 
-As migrações devem ser executadas na ordem no **SQL Editor do Supabase**:
+Os arquivos ficam em `supabase/migrations/` e devem ser executados na ordem no **SQL Editor do Supabase**:
 
 ```
-1. supabase-schema.sql                        → Schema inicial
-2. supabase-migration-001.sql                 → Colunas adicionais em app_users e despesas
-3. supabase-migration-002.sql                 → Melhorias gerais
-4. supabase-migration-003.sql                 → Pneus e planos de manutenção
-5. supabase-migration-driver-closings.sql     → Tabela de fechamentos de motoristas
-6. supabase-migration-truck-closings.sql      → Tabela de fechamentos de caminhões
-7. supabase-migration-004.sql                 → Módulo MIRO (cobranças e boletos)
-8. supabase-migration-005.sql                 → Integração Sascar (function de secrets + cron job)
-9. supabase-migration-006.sql                 → RBAC de verdade via RLS (checa role em app_users)
+ 1. supabase-schema.sql                        → Schema inicial
+ 2. supabase-migration-001.sql                 → Colunas adicionais em app_users e despesas
+ 3. supabase-migration-002.sql                 → Melhorias gerais
+ 4. supabase-migration-003.sql                 → Pneus e planos de manutenção
+ 5. supabase-migration-driver-closings.sql     → Tabela de fechamentos de motoristas
+ 6. supabase-migration-truck-closings.sql      → Tabela de fechamentos de caminhões
+ 7. supabase-migration-004.sql                 → Módulo MIRO (cobranças e boletos)
+ 8. supabase-migration-005.sql                 → Integração Sascar (function de secrets + cron job)
+ 9. supabase-migration-006.sql                 → RBAC de verdade via RLS (checa role em app_users)
+10. supabase-migration-007.sql                 → Taxa de km (R$/km) própria do motorista
+11. supabase-migration-008.sql                 → Prêmio de média incluído no acerto
+12. supabase-migration-009.sql                 → Frete associado direto a um motorista
+13. supabase-migration-010.sql                 → Inativar motoristas sem perder histórico
+14. supabase-migration-011.sql                 → Snapshot do fechamento do motorista
+15. supabase-migration-012.sql                 → Caixa de entrada de NF-e
+16. supabase-migration-013.sql                 → NF-e por e-mail (Gmail) e por upload
+17. supabase-migration-014.sql                 → MIRO: boletos independentes + conferência mensal
+18. supabase-migration-015.sql                 → Médias Parciais (início da média manual)
+19. supabase-migration-016.sql                 → Credenciais dos outros rastreadores (Getrak)
+20. supabase-migration-017.sql                 → KM por dia do New Rastreamento (km_diario)
 ```
 
 ---

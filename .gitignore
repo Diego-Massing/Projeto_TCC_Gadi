@@ -1,7 +1,3 @@
-# SQL files (contain schema but not sensitive)
-# supabase-schema.sql
-# supabase-migration-001.sql
-
 # OS files
 .DS_Store
 Thumbs.db
