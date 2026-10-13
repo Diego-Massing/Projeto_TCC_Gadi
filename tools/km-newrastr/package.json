@@ -1,0 +1,9 @@
+{
+  "name": "km-newrastr",
+  "private": true,
+  "type": "module",
+  "description": "Coleta o KM rodado dos caminhões do New Rastreamento (Playwright, roda no GitHub Actions)",
+  "dependencies": {
+    "playwright": "1.48.2"
+  }
+}

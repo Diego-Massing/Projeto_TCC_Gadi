@@ -15,3 +15,6 @@ Thumbs.db
 
 # Claude Code agent files
 .claude/
+
+# Dependências das ferramentas (tools/*)
+node_modules/
