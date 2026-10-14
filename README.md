@@ -260,6 +260,7 @@ Os arquivos ficam em `supabase/migrations/` e devem ser executados na ordem no *
 18. supabase-migration-015.sql                 → Médias Parciais (início da média manual)
 19. supabase-migration-016.sql                 → Credenciais dos outros rastreadores (Getrak)
 20. supabase-migration-017.sql                 → KM por dia do New Rastreamento (km_diario)
+21. supabase-migration-018.sql                 → Remove trucks.motorista (vem do usuário vinculado)
 ```
 
 ---

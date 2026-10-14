@@ -547,7 +547,10 @@ Pages.settings = {
             for (const [store, items] of Object.entries(data)) {
                 if (['trucks', 'fuelings', 'freights', 'fines', 'closings', 'settings', 'users', 'driverExpenses', 'driverBonuses'].includes(store)) {
                     await db.clear(store);
-                    for (const item of items) { await db.update(store, item); }
+                    for (const item of items) {
+                        if (store === 'trucks') delete item.motorista; // coluna removida (migration 018); backups antigos ainda têm
+                        await db.update(store, item);
+                    }
                 }
             }
             Utils.showToast('Backup restaurado!', 'success');
@@ -1211,7 +1214,7 @@ Pages.dataImport = {
             fuelings: [{ key: 'placa', label: 'Placa', hint: 'placa' }, { key: 'data', label: 'Data', hint: 'data' }, { key: 'litros', label: 'Litros', hint: 'litr' }, { key: 'valorLitro', label: 'Valor/Litro', hint: 'litro' }, { key: 'valorTotal', label: 'Total', hint: 'total' }, { key: 'km', label: 'KM', hint: 'km' }, { key: 'posto', label: 'Posto', hint: 'posto' }, { key: 'tipoComb', label: 'Combustível', hint: 'comb' }],
             freights: [{ key: 'placa', label: 'Placa', hint: 'placa' }, { key: 'data', label: 'Data', hint: 'data' }, { key: 'origem', label: 'Origem', hint: 'orig' }, { key: 'destino', label: 'Destino', hint: 'dest' }, { key: 'km', label: 'KM', hint: 'km' }, { key: 'tipo', label: 'Tipo (carregado/vazio)', hint: 'tipo' }, { key: 'valorFrete', label: 'Valor Frete', hint: 'valor' }, { key: 'cliente', label: 'Cliente', hint: 'client' }],
             fines: [{ key: 'placa', label: 'Placa', hint: 'placa' }, { key: 'data', label: 'Data', hint: 'data' }, { key: 'descricao', label: 'Descrição', hint: 'desc' }, { key: 'valor', label: 'Valor', hint: 'valor' }, { key: 'local', label: 'Local', hint: 'local' }, { key: 'pontos', label: 'Pontos', hint: 'pont' }, { key: 'status', label: 'Status', hint: 'status' }],
-            trucks: [{ key: 'placa', label: 'Placa', hint: 'placa' }, { key: 'modelo', label: 'Modelo', hint: 'model' }, { key: 'ano', label: 'Ano', hint: 'ano' }, { key: 'motorista', label: 'Motorista', hint: 'motor' }]
+            trucks: [{ key: 'placa', label: 'Placa', hint: 'placa' }, { key: 'modelo', label: 'Modelo', hint: 'model' }, { key: 'ano', label: 'Ano', hint: 'ano' }]
         };
         return maps[type] || [];
     },
