@@ -365,6 +365,26 @@ Pages.settings = {
         'truck_expenses', 'trucks'],
 
     async exportBackup() {
+        const now = new Date();
+        const stamp = now.toISOString().slice(0, 10) + '_' + now.toTimeString().slice(0, 5).replace(':', '');
+        const fileName = `backup-frota-${stamp}.json`;
+
+        // Chrome/Edge: deixa escolher a pasta (abre na Área de Trabalho e lembra a última);
+        // outros navegadores: download normal. O seletor tem que abrir ANTES de buscar os
+        // dados — o Chrome só permite showSaveFilePicker logo após o clique.
+        let handle = null;
+        if (window.showSaveFilePicker) {
+            try {
+                handle = await window.showSaveFilePicker({ suggestedName: fileName, startIn: 'desktop', id: 'frota-backup',
+                    types: [{ description: 'Backup Frota Control', accept: { 'application/json': ['.json'] } }] });
+            } catch (e) {
+                if (e.name === 'AbortError') return; // usuário cancelou
+                console.error(e);
+                Utils.showToast('Erro ao gerar backup: ' + e.message, 'error');
+                return;
+            }
+        }
+
         const btn = document.getElementById('btn-backup');
         btn.disabled = true; btn.textContent = '⏳ Gerando backup...';
         try {
@@ -380,23 +400,11 @@ Pages.settings = {
                 }
                 tables[t] = rows;
             }
-            const now = new Date();
-            const stamp = now.toISOString().slice(0, 10) + '_' + now.toTimeString().slice(0, 5).replace(':', '');
-            const fileName = `backup-frota-${stamp}.json`;
             const blob = new Blob([JSON.stringify({ geradoEm: now.toISOString(), tabelas: tables }, null, 1)], { type: 'application/json' });
 
-            // Chrome/Edge: deixa escolher a pasta (abre na Área de Trabalho e lembra a última);
-            // outros navegadores: download normal.
-            if (window.showSaveFilePicker) {
-                try {
-                    const handle = await window.showSaveFilePicker({ suggestedName: fileName, startIn: 'desktop', id: 'frota-backup',
-                        types: [{ description: 'Backup Frota Control', accept: { 'application/json': ['.json'] } }] });
-                    const w = await handle.createWritable();
-                    await w.write(blob); await w.close();
-                } catch (e) {
-                    if (e.name === 'AbortError') return; // usuário cancelou
-                    throw e;
-                }
+            if (handle) {
+                const w = await handle.createWritable();
+                await w.write(blob); await w.close();
             } else {
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(blob); a.download = fileName; a.click();
