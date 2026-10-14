@@ -6,6 +6,7 @@ Pages.truckDetail = {
         this.truckId = id;
         const truck = await db.getById('trucks', id);
         if (!truck) { App.navigate('trucks'); return; }
+        const motorista = ((await Pages.trucks.driverNames())[id] || []).join(', ');
 
         this._truckData = {
             truck,
@@ -22,7 +23,7 @@ Pages.truckDetail = {
 
         document.getElementById('page-content').innerHTML = `
             <div class="page-header"><div class="page-header-row">
-                <div><button class="btn btn-secondary btn-sm" onclick="App.navigate('trucks')" style="margin-bottom:8px">\u2190 Voltar</button><h1 class="page-title">${truck.placa}</h1><p class="page-subtitle">${truck.modelo || ''} ${truck.ano || ''} \u2014 ${truck.motorista || ''}</p></div>
+                <div><button class="btn btn-secondary btn-sm" onclick="App.navigate('trucks')" style="margin-bottom:8px">\u2190 Voltar</button><h1 class="page-title">${truck.placa}</h1><p class="page-subtitle">${truck.modelo || ''} ${truck.ano || ''} \u2014 ${motorista || 'Sem motorista'}</p></div>
             </div></div>
             <div class="page-body">
                 <div class="filter-bar" style="margin-bottom:16px">

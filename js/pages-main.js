@@ -254,8 +254,20 @@ Pages.dashboard = {
 
 // ===== TRUCKS =====
 Pages.trucks = {
+    // Motorista do caminhão = usuário(s) motorista ativo(s) vinculado(s) em Usuários (app_users.truckId).
+    // Não usa mais o texto livre trucks.motorista, pra não precisar cadastrar em dois lugares.
+    async driverNames() {
+        const users = await db.getAll('users');
+        const map = {};
+        users.filter(u => u.role === 'motorista' && u.ativo !== false && u.truckId).forEach(u => {
+            (map[u.truckId] = map[u.truckId] || []).push(u.nome);
+        });
+        return map;
+    },
+
     async render() {
         const trucks = await db.getAll('trucks');
+        const drivers = await this.driverNames();
         const fuelings = await db.getAll('fuelings');
         const freights = await db.getAll('freights');
 
@@ -275,7 +287,7 @@ Pages.trucks = {
                     const totalFreight = tFreight.reduce((s, f) => s + (f.valorFrete || 0), 0);
                     return `<div class="truck-card" onclick="App.navigate('truck-detail',${t.id})">
                         <div style="display:flex;justify-content:space-between;align-items:start">
-                            <div><div class="truck-placa">${t.placa}</div><div class="truck-info">${t.modelo || ''} ${t.ano || ''} — ${t.motorista || 'Sem motorista'}</div></div>
+                            <div><div class="truck-placa">${t.placa}</div><div class="truck-info">${t.modelo || ''} ${t.ano || ''} — ${(drivers[t.id] || []).join(', ') || 'Sem motorista'}</div></div>
                             <span class="badge ${t.status === 'ativo' ? 'badge-success' : 'badge-warning'}">${t.status || 'ativo'}</span>
                         </div>
                         <div class="truck-stats">
@@ -295,6 +307,7 @@ Pages.trucks = {
         let truck = null;
         const doShow = async () => {
             if (id) truck = await db.getById('trucks', id);
+            const motoristas = id ? ((await this.driverNames())[id] || []).join(', ') : '';
             const modal = document.getElementById('modal-overlay');
             modal.querySelector('.modal-header h2').textContent = id ? 'Editar Caminhão' : 'Novo Caminhão';
             modal.querySelector('.modal-body').innerHTML = `
@@ -304,7 +317,7 @@ Pages.trucks = {
                 </div>
                 <div class="form-row">
                     <div class="form-group"><label class="form-label">Ano</label><input type="number" class="form-control" id="f-ano" value="${truck?.ano || ''}" placeholder="2023"></div>
-                    <div class="form-group"><label class="form-label">Motorista</label><input type="text" class="form-control" id="f-motorista" value="${truck?.motorista || ''}" placeholder="Nome do motorista"></div>
+                    <div class="form-group"><label class="form-label">Motorista</label><input type="text" class="form-control" value="${motoristas}" placeholder="Nenhum motorista vinculado" disabled><small class="text-muted" style="font-size:0.72rem">Vem do cadastro de Usuários (veículo vinculado)</small></div>
                 </div>
                 <div class="form-row">
                     <div class="form-group"><label class="form-label">Status</label><select class="form-control" id="f-status"><option value="ativo" ${truck?.status === 'ativo' ? 'selected' : ''}>Ativo</option><option value="inativo" ${truck?.status === 'inativo' ? 'selected' : ''}>Inativo</option><option value="manutencao" ${truck?.status === 'manutencao' ? 'selected' : ''}>Em Manutenção</option></select></div>
@@ -331,7 +344,6 @@ Pages.trucks = {
             placa,
             modelo: document.getElementById('f-modelo').value.trim(),
             ano: parseInt(document.getElementById('f-ano').value) || null,
-            motorista: document.getElementById('f-motorista').value.trim(),
             status: document.getElementById('f-status').value,
             kmAtual: parseInt(document.getElementById('f-kmAtual').value) || 0,
             kmCarregado: document.getElementById('f-kmCarregado').value !== '' ? parseFloat(document.getElementById('f-kmCarregado').value) : null,
