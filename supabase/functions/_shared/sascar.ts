@@ -287,3 +287,53 @@ export function spDayStartMs(dateStr: string): number {
 export function spDayEndMs(dateStr: string): number {
   return new Date(`${dateStr}T23:59:59-03:00`).getTime();
 }
+
+export interface GpsPoint {
+  ts: number; // epoch ms
+  lat: number;
+  lon: number;
+  speed: number;
+  odo: number | null; // km (hodômetro); null quando vem zerado
+}
+
+/** Todas as posições GPS de um veículo num dia (fuso de SP), em ordem cronológica. */
+export async function getPositionsForDay(session: SascarSession, identifierVehicle: number, day: string): Promise<GpsPoint[]> {
+  const f = spDayStartMs(day), t = spDayEndMs(day);
+  const body = {
+    idContract: SASCAR_ID_CONTRACT,
+    dailyPosition: {
+      dateFromLong: f,
+      dateToLong: t,
+      identifierDeviceType: SASCAR_DEVICE_TYPE,
+      identifierClient: SASCAR_IDENTIFIER_CLIENT,
+      identifierUser: SASCAR_USER_ID,
+      identifierVehicles: identifierVehicle,
+      identifiersVehicles: identifierVehicle,
+      identifierVehiclesList: identifierVehicle,
+      identifierVehicle: identifierVehicle,
+      identifierDrivers: [],
+      identifierDriver: [],
+      nameDriver: null,
+      dateOption: "custom",
+      timeOption: "full",
+      timezoneUser: "America/Sao_Paulo",
+      dateEventFrom: f,
+      dateEventTo: t,
+      innerIdentifierClient: SASCAR_IDENTIFIER_CLIENT,
+    },
+  };
+  const resp = await fetch(POSICOES_URL, { method: "POST", headers: bffHeaders(session.bffToken), body: JSON.stringify(body) });
+  if (!resp.ok) throw new Error(`posicoes ${day} falhou: ${resp.status}`);
+  const data = await resp.json();
+  if (!data) throw new Error("Resposta vazia da Sascar (rate limit?)");
+  // Neste endpoint a data da posição vem em `date` (epoch ms).
+  return (data.payload || [])
+    .filter((p: any) => p.date && p.latitude != null && p.longitude != null)
+    .map((p: any) => ({
+      ts: Number(p.date),
+      lat: Number(p.latitude),
+      lon: Number(p.longitude),
+      speed: Number(p.speed) || 0,
+      odo: p.hodometer ? Number(p.hodometer) : null,
+    }));
+}

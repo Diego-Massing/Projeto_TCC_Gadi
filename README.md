@@ -137,6 +137,11 @@ O sistema foi projetado para transportadoras e gestores de frotas que precisam d
 - Sincronização automática diária (cron às 03:00) mantém o `kmAtual` sempre atualizado
 - Toda a comunicação com a Sascar roda em Supabase Edge Functions (`supabase/functions/sascar-sync` e `sascar-km-report`); credenciais ficam só no Supabase Vault, nunca no código
 
+### 🛰️ Fretes Sugeridos
+- Monta as viagens de um caminhão da Sascar num período (padrão: quinzena atual) a partir do GPS: acha os pátios de cliente (várias paradas somando 2h+ perto de uma cidade que já aparece nos fretes), os pontos de retorno e as passagens de aduana, e sugere origem, destino, KM (hodômetro, ou trajeto do GPS quando o hodômetro trava) e carregado/vazio pelo histórico da rota
+- Marca as viagens que já têm frete lançado; o admin aprova (abre o formulário de frete preenchido), descarta, junta duas sugestões em uma ou lança outro trecho da mesma viagem
+- Edge Function `frete-sugestoes` (regras em `supabase/functions/_shared/trips.ts`); cidades com coordenadas em `lugares_frete`
+
 ### ⚙️ Configurações
 - **Taxas R$/KM padrão:** carregado e vazio (aplicados quando não há taxa específica do caminhão)
 - **Comissões padrão:** percentuais para KM carregado e vazio
@@ -188,12 +193,15 @@ Projeto_TCC_Gadi/
 │   ├── pages-drivers.js                # Páginas: Usuários e Comissões
 │   ├── pages-extra.js                  # Páginas: Configurações, Pneus, Importação, KM Rodado
 │   ├── pages-medias.js                 # Página: Médias Parciais (km/L por abastecida)
+│   ├── pages-sugestoes.js              # Página: Fretes Sugeridos (viagens pelo GPS)
 │   └── pages-nfe.js                    # Página: Notas Recebidas (NF-e dos postos)
 │
 ├── supabase/
 │   ├── functions/                      # Edge Functions (Deno)
 │   │   ├── _shared/sascar.ts           # Cliente Sascar/Michelin: login PKCE, posições, hodômetro
 │   │   ├── _shared/getrak.ts           # Cliente Getrak (API da plataforma v2)
+│   │   ├── _shared/trips.ts            # Regras que montam as viagens a partir das posições GPS
+│   │   ├── frete-sugestoes/            # Fretes Sugeridos: viagens do GPS de um caminhão no período
 │   │   ├── sascar-sync/                # Atualiza kmAtual dos caminhões (cron diário + botão manual)
 │   │   └── sascar-km-report/           # KM rodado por caminhão num período (todos os rastreadores)
 │   └── migrations/                     # Schema inicial + migrações incrementais (.sql)
@@ -212,7 +220,7 @@ Projeto_TCC_Gadi/
 
 ## Banco de Dados
 
-O sistema utiliza **18 tabelas** no PostgreSQL via Supabase, todas com Row-Level Security habilitada. Os dados são compartilhados entre todos os admins/visualizadores da mesma frota (não isolados por conta) — o acesso é controlado pelo **role** de cada usuário em `app_users` (`admin`, `motorista`, `visualizador`), verificado no próprio banco via as funções `current_app_role()`/`current_app_truck_id()`. Motoristas só enxergam abastecimentos e fretes do caminhão vinculado à sua conta.
+O sistema utiliza **20 tabelas** no PostgreSQL via Supabase, todas com Row-Level Security habilitada. Os dados são compartilhados entre todos os admins/visualizadores da mesma frota (não isolados por conta) — o acesso é controlado pelo **role** de cada usuário em `app_users` (`admin`, `motorista`, `visualizador`), verificado no próprio banco via as funções `current_app_role()`/`current_app_truck_id()`. Motoristas só enxergam abastecimentos e fretes do caminhão vinculado à sua conta.
 
 | Tabela | Descrição |
 |---|---|
@@ -261,6 +269,7 @@ Os arquivos ficam em `supabase/migrations/` e devem ser executados na ordem no *
 19. supabase-migration-016.sql                 → Credenciais dos outros rastreadores (Getrak)
 20. supabase-migration-017.sql                 → KM por dia do New Rastreamento (km_diario)
 21. supabase-migration-018.sql                 → Remove trucks.motorista (vem do usuário vinculado)
+22. supabase-migration-019.sql                 → Fretes Sugeridos (lugares_frete + sugestões descartadas)
 ```
 
 ---

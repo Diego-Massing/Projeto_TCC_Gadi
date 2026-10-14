@@ -253,8 +253,8 @@ const App = {
     // Check if current user can access a page
     canAccess(page) {
         const access = {
-            admin: ['dashboard', 'trucks', 'truck-detail', 'fuelings', 'truck-expenses', 'freights', 'fines', 'users', 'driver-closing', 'closing', 'import', 'settings', 'tires-analytics', 'miro', 'km-report', 'medias', 'nfe'],
-            visualizador: ['dashboard', 'trucks', 'truck-detail', 'fuelings', 'truck-expenses', 'freights', 'fines', 'users', 'driver-closing', 'closing', 'tires-analytics', 'miro', 'km-report', 'medias'],
+            admin: ['dashboard', 'trucks', 'truck-detail', 'fuelings', 'truck-expenses', 'freights', 'fines', 'users', 'driver-closing', 'closing', 'import', 'settings', 'tires-analytics', 'miro', 'km-report', 'medias', 'nfe', 'freight-suggest'],
+            visualizador: ['dashboard', 'trucks', 'truck-detail', 'fuelings', 'truck-expenses', 'freights', 'fines', 'users', 'driver-closing', 'closing', 'tires-analytics', 'miro', 'km-report', 'medias', 'freight-suggest'],
             motorista: ['fuelings', 'freights']
         };
         return (access[this.userRole] || access.admin).includes(page);
@@ -301,6 +301,7 @@ const App = {
             case 'fuelings': await Pages.fuelings.render(); break;
             case 'truck-expenses': await Pages.truckExpenses.render(); break;
             case 'freights': await Pages.freights.render(); break;
+            case 'freight-suggest': await Pages.freightSuggest.render(); break;
             case 'miro': await Pages.miro.render(); break;
             case 'fines': await Pages.fines.render(); break;
             case 'users': await Pages.users.render(); break;

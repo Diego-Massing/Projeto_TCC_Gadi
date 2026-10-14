@@ -374,17 +374,20 @@ Pages.freights = {
         document.getElementById('freights-table').innerHTML = this.renderTable(freights, trucks, drivers);
     },
 
-    async showForm(id, presetTruckId) {
+    // preset: campos pré-preenchidos de um frete novo (usado por Fretes Sugeridos)
+    async showForm(id, presetTruckId, preset) {
         this._driverTouched = false;
+        this._onSaved = null;
         const trucks = await db.getAll('trucks');
         let item = null;
         if (id) item = await db.getById('freights', id);
+        else if (preset) item = { ...preset };
         const drivers = (await db.getAll('users')).filter(u => u.role === 'motorista' && (u.ativo !== false || u.id === item?.userId));
         const currentMod = item?.modalidade || 'kmPlaca';
 
         const isDriverRole = App.userRole === 'motorista';
         let suggestedDriverId = item?.userId ?? null;
-        if (!item) {
+        if (!id) {
             const tId = presetTruckId || (isDriverRole ? App.userTruckId : null);
             if (tId) {
                 const drv = await db.getDriverForTruck(tId);
@@ -713,7 +716,9 @@ Pages.freights = {
                 // Actually, let's only update kmAtual securely from Fuelings which requests absolute odometer. Let's ignore it here initially unless requested.
             }
 
-            Utils.showToast(id ? 'Frete atualizado!' : 'Frete registrado!', 'success'); App.closeModal(); Pages.freights.applyFilter(Pages.freights._isDateRangeActive());
+            Utils.showToast(id ? 'Frete atualizado!' : 'Frete registrado!', 'success'); App.closeModal();
+            const onSaved = this._onSaved; this._onSaved = null;
+            if (onSaved) onSaved(data); else Pages.freights.applyFilter(Pages.freights._isDateRangeActive());
         } catch (e) { Utils.showToast('Erro ao salvar', 'error'); } finally { this._saving = false; }
     },
 

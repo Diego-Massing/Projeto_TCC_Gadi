@@ -181,6 +181,9 @@
                     <button class="nav-item" data-page="freights" data-roles="admin,visualizador,motorista">
                         <span class="nav-icon">📦</span> Fretes
                     </button>
+                    <button class="nav-item" data-page="freight-suggest" data-roles="admin,visualizador">
+                        <span class="nav-icon">🛰️</span> Fretes Sugeridos
+                    </button>
                     <button class="nav-item" data-page="miro" data-roles="admin,visualizador">
                         <span class="nav-icon">🔷</span> Cobranças MIRO
                     </button>
@@ -263,7 +266,7 @@
         const _scripts = [
             'js/supabase-config.js', 'js/database.js', 'js/utils.js', 'js/charts.js', 'js/maps.js',
             'js/pages-main.js', 'js/pages-detail.js', 'js/pages-data.js', 'js/pages-extra.js',
-            'js/pages-drivers.js', 'js/pages-nfe.js', 'js/pages-medias.js', 'js/app.js'
+            'js/pages-drivers.js', 'js/pages-nfe.js', 'js/pages-medias.js', 'js/pages-sugestoes.js', 'js/app.js'
         ];
         _scripts.forEach(src => { document.write(`<script src="${src}?v=${_v}"><\/script>`); });
     </script>
