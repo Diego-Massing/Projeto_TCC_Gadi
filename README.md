@@ -271,6 +271,7 @@ Os arquivos ficam em `supabase/migrations/` e devem ser executados na ordem no *
 21. supabase-migration-018.sql                 → Remove trucks.motorista (vem do usuário vinculado)
 22. supabase-migration-019.sql                 → Fretes Sugeridos (lugares_frete + sugestões descartadas)
 23. supabase-migration-020.sql                 → Login ligado ao usuário (app_users.auth_uid) — corrige papéis no banco
+24. supabase-migration-021.sql                 → Usuário só-leitura do backup diário (repo privado frota-backup)
 ```
 
 ---
