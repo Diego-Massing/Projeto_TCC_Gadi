@@ -209,27 +209,24 @@ const App = {
         }
     },
 
-    // Load current user profile from app_users by matching auth email
+    // Load current user profile from app_users (auth_uid = conta de login; o banco usa a
+    // mesma ligação nas regras de acesso). Sem cadastro ativo = sem acesso.
     async loadCurrentUser() {
-        try {
-            const users = await db.getAll('users');
-            const match = users.find(u => u.authEmail && u.authEmail.toLowerCase() === this.userEmail?.toLowerCase());
-            if (match) {
-                this.userRole = match.role || 'admin';
-                this.userTruckId = match.truckId || null;
-                this.userAppId = match.id;
-                console.log(`RBAC: Logged in as ${match.nome} (${this.userRole})${this.userTruckId ? ', truck=' + this.userTruckId : ''}`);
-            } else {
-                // No matching app_users record = system owner = admin
-                this.userRole = 'admin';
-                this.userTruckId = null;
-                this.userAppId = null;
-                console.log('RBAC: No app_users match — defaulting to admin');
-            }
-        } catch (e) {
-            console.error('RBAC: Error loading user profile:', e);
-            this.userRole = 'admin';
+        const uid = (await supabase.auth.getUser()).data.user?.id;
+        const { data: match, error } = await supabase.from('app_users')
+            .select('id, nome, role, "truckId", ativo').eq('auth_uid', uid).maybeSingle();
+        if (error) throw error;
+        if (!match || match.ativo === false) {
+            const aviso = 'Esta conta não tem acesso ao sistema. Peça a um administrador para liberar o seu usuário.';
+            await supabase.auth.signOut();
+            const msg = document.getElementById('login-message');
+            if (msg) { msg.style.color = '#ef4444'; msg.innerText = aviso; }
+            throw new Error(aviso);
         }
+        this.userRole = match.role;
+        this.userTruckId = match.truckId || null;
+        this.userAppId = match.id;
+        console.log(`RBAC: Logged in as ${match.nome} (${this.userRole})${this.userTruckId ? ', truck=' + this.userTruckId : ''}`);
     },
 
     // Filter sidebar and UI based on role

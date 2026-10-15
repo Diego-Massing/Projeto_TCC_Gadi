@@ -270,6 +270,7 @@ Os arquivos ficam em `supabase/migrations/` e devem ser executados na ordem no *
 20. supabase-migration-017.sql                 → KM por dia do New Rastreamento (km_diario)
 21. supabase-migration-018.sql                 → Remove trucks.motorista (vem do usuário vinculado)
 22. supabase-migration-019.sql                 → Fretes Sugeridos (lugares_frete + sugestões descartadas)
+23. supabase-migration-020.sql                 → Login ligado ao usuário (app_users.auth_uid) — corrige papéis no banco
 ```
 
 ---
