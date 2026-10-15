@@ -30,6 +30,14 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: req.headers.get("Authorization")! } } },
     );
+    // A chave anon também passa no verify_jwt: checa o papel antes de logar nos rastreadores.
+    const { data: role } = await userClient.rpc("current_app_role");
+    if (role !== "admin" && role !== "visualizador") {
+      return new Response(JSON.stringify({ error: "Sem permissão" }), {
+        status: 403,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      });
+    }
     const { data: trucks, error: trucksErr } = await userClient.from("trucks").select("id, placa").order("placa");
     if (trucksErr) throw trucksErr;
 

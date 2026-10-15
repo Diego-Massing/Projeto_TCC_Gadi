@@ -14,7 +14,10 @@
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚛</text></svg>">
 
     <!-- Supabase JS SDK (UMD bundle for browser) -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <!-- Versão fixa + integrity: se o arquivo do CDN mudar, o navegador não executa.
+         Para atualizar: trocar a versão e recalcular o hash (sha384 do dist/umd/supabase.js do pacote npm). -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js"
+        integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 
     <style>
         /* Login Screen Styles (Inline for now until added to CSS) */

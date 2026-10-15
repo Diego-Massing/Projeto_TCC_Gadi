@@ -39,7 +39,7 @@ Pages.fuelings = {
         const totalL = fuelings.reduce((s, f) => s + (f.litros || 0), 0);
         return `<div class="table-container"><table class="data-table"><thead><tr><th>Placa</th><th>Data</th><th>Posto</th><th>Litros</th><th>R$/L</th><th>KM</th><th>Total</th><th>Tipo</th><th></th></tr></thead><tbody>${fuelings.map(f => {
             const t = trucks.find(tt => tt.id === f.truckId); return `<tr>
-                <td class="font-mono font-bold">${t?.placa || '—'}</td><td>${Utils.formatDate(f.data)}</td><td>${f.posto || '—'}</td>
+                <td class="font-mono font-bold">${t?.placa || '—'}</td><td>${Utils.formatDate(f.data)}</td><td>${Utils.esc(f.posto) || '—'}</td>
                 <td>${Utils.formatNumber(f.litros, 2)}</td><td>${Utils.formatCurrency(f.valorLitro)}</td><td>${Utils.formatNumber(f.km)}</td>
                 <td class="font-bold">${Utils.formatCurrency(f.valorTotal)}</td><td><span class="badge badge-info">${f.tipoComb || 'Diesel'}</span></td>
                 <td>${App.userRole !== 'visualizador' ? `<button class="btn btn-icon btn-secondary btn-sm" onclick="Pages.fuelings.showForm(${f.id})">✏️</button> <button class="btn btn-icon btn-sm" style="color:var(--accent-danger)" onclick="Pages.fuelings.remove(${f.id})">🗑️</button>` : ''}</td>
@@ -84,7 +84,7 @@ Pages.fuelings = {
             </div>
             <div class="form-row">
                 <div class="form-group"><label class="form-label">KM Atual</label><input type="number" class="form-control" id="f-km" value="${item?.km || ''}"></div>
-                <div class="form-group"><label class="form-label">Posto</label><input type="text" class="form-control" id="f-posto" value="${item?.posto || ''}"></div>
+                <div class="form-group"><label class="form-label">Posto</label><input type="text" class="form-control" id="f-posto" value="${Utils.esc(item?.posto) || ''}"></div>
                 <div class="form-group"><label class="form-label">Combustível</label><select class="form-control" id="f-tipoComb" onchange="Pages.fuelings.toggleArlaField()"><option value="Diesel" ${item?.tipoComb === 'Diesel' ? 'selected' : ''}>Diesel</option><option value="Diesel S-10" ${item?.tipoComb === 'Diesel S-10' ? 'selected' : ''}>Diesel S-10</option><option value="Arla" ${item?.tipoComb === 'Arla' ? 'selected' : ''}>Arla</option></select></div>
             </div>
             <div class="form-row" id="f-arla-container" style="display:${(!item || item?.tipoComb === 'Diesel' || item?.tipoComb === 'Diesel S-10' || item?.tipoComb === 'Diesel+Arla') ? 'flex' : 'none'};background:var(--bg-secondary);padding:12px;border-radius:8px;align-items:center;border:1px dashed var(--border-color)">
@@ -223,7 +223,7 @@ Pages.freights = {
         const addBtn = isViewer ? '' : `<button class="btn btn-primary" onclick="Pages.freights.showForm()">＋ Novo Frete</button>`;
         const exportBtn = isDriver ? '' : `<button class="btn btn-secondary btn-sm" onclick="Pages.freights.exportCSV()">📥 Exportar</button>`;
         const truckFilter = isDriver ? '' : `<div class="form-group"><label class="form-label">Placa</label><select class="form-control" id="filter-fr-truck" onchange="Pages.freights.applyFilter()"><option value="">Todas</option>${trucks.map(t => `<option value="${t.id}">${t.placa}</option>`).join('')}</select></div>`;
-        const driverFilter = isDriver ? '' : `<div class="form-group"><label class="form-label">Motorista</label><select class="form-control" id="filter-fr-driver" onchange="Pages.freights.applyFilter()"><option value="">Todos</option>${drivers.map(d => `<option value="${d.id}">${d.nome}</option>`).join('')}</select></div>`;
+        const driverFilter = isDriver ? '' : `<div class="form-group"><label class="form-label">Motorista</label><select class="form-control" id="filter-fr-driver" onchange="Pages.freights.applyFilter()"><option value="">Todos</option>${drivers.map(d => `<option value="${d.id}">${Utils.esc(d.nome)}</option>`).join('')}</select></div>`;
 
         document.getElementById('page-content').innerHTML = `
             <div class="page-header"><div class="page-header-row">
@@ -280,14 +280,14 @@ Pages.freights = {
             return `<tr>
                 <td><input type="checkbox" class="freight-checkbox" value="${f.id}" onchange="Pages.freights.updateBulkBar()"></td>
                 <td class="font-mono font-bold">${t?.placa || '—'}${f.isMiro ? ' <span style="font-size:0.58rem;background:var(--accent-info);color:#fff;padding:1px 4px;border-radius:3px;vertical-align:middle">MIRO</span>' : ''}</td>
-                <td>${drv ? drv.nome : '<span class="text-muted">—</span>'}</td>
-                <td>${Utils.formatDate(f.data)}</td><td>${f.origem || '—'}</td><td>${f.destino || '—'}</td>
-                <td>${Utils.formatNumber(f.km)}</td><td><span class="badge ${f.tipo === 'carregado' ? 'badge-success' : 'badge-warning'}">${f.tipo || '—'}</span></td>
+                <td>${drv ? Utils.esc(drv.nome) : '<span class="text-muted">—</span>'}</td>
+                <td>${Utils.formatDate(f.data)}</td><td>${Utils.esc(f.origem) || '—'}</td><td>${Utils.esc(f.destino) || '—'}</td>
+                <td>${Utils.formatNumber(f.km)}</td><td><span class="badge ${f.tipo === 'carregado' ? 'badge-success' : 'badge-warning'}">${Utils.esc(f.tipo) || '—'}</span></td>
                 <td><span class="badge ${modalColors[mod] || 'badge-info'}" style="font-size:0.68rem">${modalLabels[mod] || mod}</span></td>
                 <td>${mod === 'fechado' ? `<span class="text-muted" style="font-size:0.75rem">${Utils.formatCurrency(f.taxaKmEfetiva || f.taxaKm)}</span>` : Utils.formatCurrency(f.taxaKm)}</td>
                 <td class="font-bold text-success">${f.desconto > 0 ? `<span title="Bruto: ${Utils.formatCurrency(f.valorFrete)}">${Utils.formatCurrency((f.valorFrete || 0) - (f.desconto || 0))}</span><br><span style="font-size:0.65rem;color:var(--accent-warning);font-weight:400">-${Utils.formatCurrency(f.desconto)}${f.descontoObs ? ' ' + f.descontoObs : ''}</span>` : Utils.formatCurrency(f.valorFrete)}</td>
                 <td>${this.getPaymentBadges(f)}</td>
-                <td>${f.cliente || '—'}</td>
+                <td>${Utils.esc(f.cliente) || '—'}</td>
                 <td>${App.userRole !== 'visualizador' ? `<button class="btn btn-icon btn-secondary btn-sm" onclick="Pages.freights.showForm(${f.id})">✏️</button> <button class="btn btn-icon btn-sm" style="color:var(--accent-danger)" onclick="Pages.freights.remove(${f.id})">🗑️</button>` : ''}</td>
             </tr>`;
         }).join('')}</tbody></table></div>
@@ -404,11 +404,11 @@ Pages.freights = {
                 <div class="form-group"><label class="form-label">Data *</label><input type="date" class="form-control" id="f-data" value="${item?.data || new Date().toISOString().split('T')[0]}"></div>
             </div>
             <div class="form-row">
-                <div class="form-group"><label class="form-label">Motorista</label><select class="form-control" id="f-userId" onchange="Pages.freights._driverTouched = true" ${isDriverRole ? 'disabled' : ''}><option value="">— Nenhum específico —</option>${drivers.map(d => `<option value="${d.id}" ${driverValue === d.id ? 'selected' : ''}>${d.nome}</option>`).join('')}</select></div>
+                <div class="form-group"><label class="form-label">Motorista</label><select class="form-control" id="f-userId" onchange="Pages.freights._driverTouched = true" ${isDriverRole ? 'disabled' : ''}><option value="">— Nenhum específico —</option>${drivers.map(d => `<option value="${d.id}" ${driverValue === d.id ? 'selected' : ''}>${Utils.esc(d.nome)}</option>`).join('')}</select></div>
             </div>
             <div class="form-row">
-                <div class="form-group"><label class="form-label">Cidade Origem *</label><input type="text" class="form-control" id="f-origem" value="${item?.origem || ''}" placeholder="Ex: São Paulo"></div>
-                <div class="form-group"><label class="form-label">Cidade Destino *</label><input type="text" class="form-control" id="f-destino" value="${item?.destino || ''}" placeholder="Ex: Curitiba"></div>
+                <div class="form-group"><label class="form-label">Cidade Origem *</label><input type="text" class="form-control" id="f-origem" value="${Utils.esc(item?.origem) || ''}" placeholder="Ex: São Paulo"></div>
+                <div class="form-group"><label class="form-label">Cidade Destino *</label><input type="text" class="form-control" id="f-destino" value="${Utils.esc(item?.destino) || ''}" placeholder="Ex: Curitiba"></div>
                 <button class="btn btn-secondary btn-sm" onclick="Pages.freights.calcDistance()" style="margin-top:20px;white-space:nowrap" title="Calcular KM via OSRM (gratuito)">📏 Calcular KM</button>
             </div>
             <div style="margin-bottom:8px">
@@ -454,10 +454,10 @@ Pages.freights = {
                 </div>
             </div>
             <div class="form-row">
-                <div class="form-group"><label class="form-label">Cliente</label><input type="text" class="form-control" id="f-cliente" value="${item?.cliente || ''}"></div>
+                <div class="form-group"><label class="form-label">Cliente</label><input type="text" class="form-control" id="f-cliente" value="${Utils.esc(item?.cliente) || ''}"></div>
                 <div class="form-group"><label class="form-label">Nota Fiscal</label><input type="text" class="form-control" id="f-notaFiscal" value="${item?.notaFiscal || ''}"></div>
             </div>
-            <div class="form-group"><label class="form-label">Observações</label><input type="text" class="form-control" id="f-obs" value="${item?.obs || ''}"></div>
+            <div class="form-group"><label class="form-label">Observações</label><input type="text" class="form-control" id="f-obs" value="${Utils.esc(item?.obs) || ''}"></div>
             <div id="f-desconto-section" style="margin-top:8px;padding:10px;background:var(--bg-primary);border-radius:var(--radius-md);border:1px dashed var(--border-color);display:${(item?.isMiro || (item?.desconto > 0)) ? 'block' : 'none'}">
                 <label class="form-label" style="color:var(--accent-warning)">✂️ Desconto sobre o Frete</label>
                 <div class="form-row" style="margin-bottom:0">
@@ -873,9 +873,9 @@ Pages.truckExpenses = {
             return `<tr>
                     <td class="font-mono font-bold">${t?.placa || '—'}</td>
                     <td>${Utils.formatDate(e.data)}</td>
-                    <td><span class="badge badge-secondary">${e.tipo}</span></td>
-                    <td>${e.fornecedor || '—'}</td>
-                    <td>${e.descricao || '—'}</td>
+                    <td><span class="badge badge-secondary">${Utils.esc(e.tipo)}</span></td>
+                    <td>${Utils.esc(e.fornecedor) || '—'}</td>
+                    <td>${Utils.esc(e.descricao) || '—'}</td>
                     <td class="font-bold text-danger">-${Utils.formatCurrency(e.valor)}</td>
                     <td>${App.userRole === 'admin' ? `<button class="btn btn-icon btn-secondary btn-sm" onclick="Pages.truckExpenses.showForm(${e.id})">✏️</button> <button class="btn btn-icon btn-sm" style="color:var(--accent-danger)" onclick="Pages.truckExpenses.remove(${e.id})">🗑️</button>` : ''}</td>
                 </tr>`;
@@ -941,9 +941,9 @@ Pages.truckExpenses = {
             <div class="form-group" id="group-driver-fill" style="display:none;margin-top:-10px;margin-bottom:10px">
                 <button class="btn btn-sm btn-secondary" onclick="Pages.truckExpenses.fillSalary()" style="width:100%">⬇️ Preencher com Salário do Motorista Vinculado</button>
             </div>
-            <div class="form-group"><label class="form-label">Fornecedor / Oficina</label><input type="text" class="form-control" id="te-fornecedor" value="${item?.fornecedor || ''}" placeholder="Nome da oficina, seguradora, banco..."></div>
-            <div class="form-group"><label class="form-label">Descrição</label><input type="text" class="form-control" id="te-descricao" value="${item?.descricao || ''}" placeholder="Detalhes (peças, serviço, parcela 1/x)"></div>
-            <div class="form-group"><label class="form-label">Observações</label><input type="text" class="form-control" id="te-obs" value="${item?.obs || ''}"></div>`;
+            <div class="form-group"><label class="form-label">Fornecedor / Oficina</label><input type="text" class="form-control" id="te-fornecedor" value="${Utils.esc(item?.fornecedor) || ''}" placeholder="Nome da oficina, seguradora, banco..."></div>
+            <div class="form-group"><label class="form-label">Descrição</label><input type="text" class="form-control" id="te-descricao" value="${Utils.esc(item?.descricao) || ''}" placeholder="Detalhes (peças, serviço, parcela 1/x)"></div>
+            <div class="form-group"><label class="form-label">Observações</label><input type="text" class="form-control" id="te-obs" value="${Utils.esc(item?.obs) || ''}"></div>`;
 
         modal.querySelector('.modal-footer').innerHTML = `<button class="btn btn-secondary" onclick="App.closeModal()">Cancelar</button><button class="btn btn-primary" onclick="Pages.truckExpenses.save(${id || 'null'})">Salvar</button>`;
         App.openModal();
@@ -1170,7 +1170,7 @@ Pages.miro = {
                 return `<tr>
                     <td>${Utils.formatDate(b.emissao)}</td>
                     <td>${Utils.formatDate(b.vencimento)}</td>
-                    <td><span class="font-mono">${this.esc(b.numeroBoleto) || '—'}</span>${b.complementar ? ' <span class="badge badge-warning" style="font-size:0.62rem">complementar</span>' : ''}${b.obs ? `<div style="font-size:0.7rem;color:var(--text-secondary)">${this.esc(b.obs)}</div>` : ''}</td>
+                    <td><span class="font-mono">${this.esc(b.numeroBoleto) || '—'}</span>${b.complementar ? ' <span class="badge badge-warning" style="font-size:0.62rem">complementar</span>' : ''}${Utils.esc(b.obs) ? `<div style="font-size:0.7rem;color:var(--text-secondary)">${this.esc(b.obs)}</div>` : ''}</td>
                     <td class="font-bold" style="color:var(--accent-info)">${Utils.formatCurrency(b.valor)}</td>
                     <td>${conf ? `<span class="badge badge-success" style="font-size:0.7rem">${this.esc(conf.referencia)}</span>` : '<span class="badge badge-warning" style="font-size:0.7rem">Em aberto</span>'}</td>
                     <td><button class="btn btn-sm" ${canEdit ? '' : 'disabled'} style="font-size:0.65rem;padding:2px 7px;background:${b.pago ? 'var(--accent-success)' : 'var(--bg-tertiary)'};color:${b.pago ? '#fff' : 'var(--text-secondary)'};border:none;border-radius:4px;cursor:pointer" onclick="Pages.miro.togglePago(${b.id})">${b.pago ? '✅ Pago' : '⬜ Pendente'}</button></td>
@@ -1197,7 +1197,7 @@ Pages.miro = {
                     <div>
                         <strong style="font-size:1rem">${this.esc(c.referencia)}</strong>
                         <div style="font-size:0.75rem;color:var(--text-secondary);margin-top:2px">Conferido em ${Utils.formatDate(c.data)}</div>
-                        ${c.obs ? `<div style="font-size:0.75rem;color:var(--text-secondary);margin-top:2px">${this.esc(c.obs)}</div>` : ''}
+                        ${Utils.esc(c.obs) ? `<div style="font-size:0.75rem;color:var(--text-secondary);margin-top:2px">${this.esc(c.obs)}</div>` : ''}
                     </div>
                     <div style="font-size:0.82rem;min-width:240px">
                         ${line('Saldo anterior', Utils.formatCurrency(c.saldoAnterior))}

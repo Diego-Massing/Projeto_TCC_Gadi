@@ -37,11 +37,11 @@ Pages.users = {
                     const roleLabels = { admin: '🛡️ Admin', motorista: '🚛 Motorista', visualizador: '👁️ Visualizador' };
                     const isInactiveDriver = u.role === 'motorista' && u.ativo === false;
                     return `<tr${isInactiveDriver ? ' style="opacity:0.6"' : ''}>
-                            <td class="font-bold">${u.nome || '—'}</td>
+                            <td class="font-bold">${Utils.esc(u.nome) || '—'}</td>
                             <td><span class="badge ${roleColors[u.role] || 'badge-info'}">${roleLabels[u.role] || u.role}</span> ${isInactiveDriver ? '<span class="badge badge-danger" title="Motorista inativo">Inativo</span>' : ''}</td>
-                            <td>${u.temLogin ? '<span class="badge badge-success" title="' + (u.authEmail || '') + '">🔐 Sim</span>' : '<span class="text-muted">—</span>'}</td>
+                            <td>${u.temLogin ? '<span class="badge badge-success" title="' + (Utils.esc(u.authEmail) || '') + '">🔐 Sim</span>' : '<span class="text-muted">—</span>'}</td>
                             <td class="font-mono">${truck ? truck.placa : '<span class="text-muted">—</span>'}</td>
-                            <td>${u.telefone || '—'}</td>
+                            <td>${Utils.esc(u.telefone) || '—'}</td>
                             <td>${u.role === 'motorista' ? Utils.formatCurrency(u.salarioFixo || 0) : '—'}</td>
                             <td>
                                 ${App.userRole === 'admin' ? `<button class="btn btn-icon btn-secondary btn-sm" onclick="Pages.users.showForm(${u.id})">✏️</button>` : ''}
@@ -76,20 +76,20 @@ Pages.users = {
         const modal = document.getElementById('modal-overlay');
         modal.querySelector('.modal-header h2').textContent = id ? 'Editar Usuário' : 'Novo Usuário';
         modal.querySelector('.modal-body').innerHTML = `
-            <div class="form-group"><label class="form-label">Nome Completo *</label><input type="text" class="form-control" id="f-nome" value="${user?.nome || ''}"></div>
+            <div class="form-group"><label class="form-label">Nome Completo *</label><input type="text" class="form-control" id="f-nome" value="${Utils.esc(user?.nome) || ''}"></div>
             <div class="form-row">
                 <div class="form-group"><label class="form-label">Função *</label><select class="form-control" id="f-role" onchange="Pages.users.toggleDriverFields()">
                     <option value="motorista" ${user?.role === 'motorista' || !user ? 'selected' : ''}>🚛 Motorista</option>
                     <option value="admin" ${user?.role === 'admin' ? 'selected' : ''}>🛡️ Administrador</option>
                     <option value="visualizador" ${user?.role === 'visualizador' ? 'selected' : ''}>👁️ Visualizador</option>
                 </select></div>
-                <div class="form-group"><label class="form-label">Telefone</label><input type="text" class="form-control" id="f-telefone" value="${user?.telefone || ''}" placeholder="(11) 99999-9999"></div>
+                <div class="form-group"><label class="form-label">Telefone</label><input type="text" class="form-control" id="f-telefone" value="${Utils.esc(user?.telefone) || ''}" placeholder="(11) 99999-9999"></div>
             </div>
             <div id="driver-fields">
                 <div class="form-row">
                     <div class="form-group"><label class="form-label">Caminhão Associado</label><select class="form-control" id="f-truckId">
                         <option value="">— Nenhum —</option>
-                        ${trucks.map(t => `<option value="${t.id}" ${user?.truckId === t.id ? 'selected' : ''}>${t.placa} — ${t.modelo || ''}</option>`).join('')}
+                        ${trucks.map(t => `<option value="${t.id}" ${user?.truckId === t.id ? 'selected' : ''}>${t.placa} — ${Utils.esc(t.modelo) || ''}</option>`).join('')}
                     </select></div>
                     <div class="form-group"><label class="form-label">Salário Fixo Mensal</label><input type="number" step="0.01" class="form-control" id="f-salarioFixo" value="${user?.salarioFixo || ''}" placeholder="0.00"></div>
                 </div>
@@ -104,7 +104,7 @@ Pages.users = {
                 </div>
                 <p class="text-muted" style="font-size:0.75rem;margin-top:-8px">Só afeta o cálculo da comissão deste motorista. O km e o valor do frete continuam sendo lançados normalmente na tela de Fretes, usando a taxa da placa. Deixe em branco para a comissão continuar usando a taxa da placa/padrão.</p>
             </div>
-            <div class="form-group"><label class="form-label">Observações</label><input type="text" class="form-control" id="f-obs" value="${user?.obs || ''}"></div>
+            <div class="form-group"><label class="form-label">Observações</label><input type="text" class="form-control" id="f-obs" value="${Utils.esc(user?.obs) || ''}"></div>
             <hr style="border-color:#333;margin:16px 0">
             <div class="form-group" style="display:flex;align-items:center;gap:12px">
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
@@ -114,7 +114,7 @@ Pages.users = {
             </div>
             <div id="login-fields" style="display:none">
                 <div class="form-row">
-                    <div class="form-group"><label class="form-label">E-mail de acesso *</label><input type="email" class="form-control" id="f-authEmail" value="${user?.authEmail || ''}" placeholder="email@exemplo.com"></div>
+                    <div class="form-group"><label class="form-label">E-mail de acesso *</label><input type="email" class="form-control" id="f-authEmail" value="${Utils.esc(user?.authEmail) || ''}" placeholder="email@exemplo.com"></div>
                     ${!id ? '<div class="form-group"><label class="form-label">Senha inicial *</label><input type="password" class="form-control" id="f-authPassword" placeholder="Mín. 6 caracteres"></div>' : ''}
                 </div>
                 <p class="text-muted" style="font-size:0.75rem;margin-top:-8px">${id && user?.temLogin ? '⚠️ Para alterar a senha, o usuário deve usar "Esqueci minha senha".' : 'Uma conta será criada para este usuário acessar o sistema.'}</p>
@@ -248,7 +248,7 @@ Pages.driverClosing = {
                 <div class="filter-bar">
                     <div class="form-group"><label class="form-label">Motorista</label><select class="form-control" id="dc-driver" onchange="Pages.driverClosing.onFilterChange()">
                         <option value="">Selecione</option>
-                        ${drivers.map(d => { const trk = trucks.find(t => t.id === d.truckId); return `<option value="${d.id}" ${d.id === userId ? 'selected' : ''}>${d.nome} ${trk ? '(' + trk.placa + ')' : ''}</option>`; }).join('')}
+                        ${drivers.map(d => { const trk = trucks.find(t => t.id === d.truckId); return `<option value="${d.id}" ${d.id === userId ? 'selected' : ''}>${Utils.esc(d.nome)} ${trk ? '(' + trk.placa + ')' : ''}</option>`; }).join('')}
                     </select></div>
                     <div class="form-group"><label class="form-label">Data Início</label><input type="date" class="form-control" id="dc-data-inicio" value="${primeiroDia}" onchange="Pages.driverClosing.onFilterChange()"></div>
                     <div class="form-group"><label class="form-label">Data Fim</label><input type="date" class="form-control" id="dc-data-fim" value="${ultimoDia}" onchange="Pages.driverClosing.onFilterChange()"></div>
@@ -587,7 +587,7 @@ Pages.driverClosing = {
         // Render Expenses
         const expHtml = expenses.length ? `<table class="table-sm" style="width:100%">
             ${expenses.map(e => `<tr style="border-bottom:1px solid #eee">
-                <td style="padding:8px"><div style="font-weight:600">${e.descricao}</div><div style="font-size:0.75rem;color:#888">${Utils.formatDate(e.data)}</div></td>
+                <td style="padding:8px"><div style="font-weight:600">${Utils.esc(e.descricao)}</div><div style="font-size:0.75rem;color:#888">${Utils.formatDate(e.data)}</div></td>
                 <td class="text-right" style="padding:8px"><div style="font-weight:600">${Utils.formatCurrency(e.valor)}</div></td>
                 <td style="width:30px"><button class="btn-icon" style="color:red;font-size:12px" onclick="Pages.driverClosing.removeExpense(${e.id})">🗑️</button></td>
             </tr>`).join('')}
@@ -597,7 +597,7 @@ Pages.driverClosing = {
         // Render Bonuses
         const bonHtml = bonuses.length ? `<table class="table-sm" style="width:100%">
             ${bonuses.map(e => `<tr style="border-bottom:1px solid #eee">
-                <td style="padding:8px"><div style="font-weight:600">${e.descricao}</div><div style="font-size:0.75rem;color:#888">${Utils.formatDate(e.data)}</div></td>
+                <td style="padding:8px"><div style="font-weight:600">${Utils.esc(e.descricao)}</div><div style="font-size:0.75rem;color:#888">${Utils.formatDate(e.data)}</div></td>
                 <td class="text-right" style="padding:8px"><div style="font-weight:600;color:green">${Utils.formatCurrency(e.valor)}</div></td>
                 <td style="width:30px"><button class="btn-icon" style="color:red;font-size:12px" onclick="Pages.driverClosing.removeBonus(${e.id})">🗑️</button></td>
             </tr>`).join('')}
@@ -607,7 +607,7 @@ Pages.driverClosing = {
         // Render Discounts
         const discHtml = discounts.length ? `<table class="table-sm" style="width:100%">
             ${discounts.map(e => `<tr style="border-bottom:1px solid #eee">
-                <td style="padding:8px"><div style="font-weight:600">${e.descricao}</div><div style="font-size:0.75rem;color:#888">${Utils.formatDate(e.data)}</div></td>
+                <td style="padding:8px"><div style="font-weight:600">${Utils.esc(e.descricao)}</div><div style="font-size:0.75rem;color:#888">${Utils.formatDate(e.data)}</div></td>
                 <td class="text-right" style="padding:8px"><div style="font-weight:600;color:red">-${Utils.formatCurrency(e.valor)}</div></td>
                 <td style="width:30px"><button class="btn-icon" style="color:red;font-size:12px" onclick="Pages.driverClosing.removeDiscount(${e.id})">🗑️</button></td>
             </tr>`).join('')}
@@ -701,13 +701,13 @@ Pages.driverClosing = {
                                 <div class="form-group" style="flex:1">
                                     <label class="form-label" style="font-weight:700;color:var(--accent-warning)">\ud83c\udfc1 Abastecida Inicial</label>
                                     <select class="form-control" id="media-fuel-start" onchange="Pages.driverClosing.recalcMedia()">
-                                        ${allF.map((f, i) => '<option value="' + f.id + '"' + (i === 0 ? ' selected' : '') + '>' + (f._prevMonth ? '[M\u00eas ant.] ' : '') + Utils.formatDate(f.data) + ' \u2014 ' + Utils.formatNumber(f.km) + ' km \u2014 ' + Utils.formatNumber(f.litros, 1) + 'L' + (f.posto ? ' \u2014 ' + f.posto : '') + '</option>').join('')}
+                                        ${allF.map((f, i) => '<option value="' + f.id + '"' + (i === 0 ? ' selected' : '') + '>' + (f._prevMonth ? '[M\u00eas ant.] ' : '') + Utils.formatDate(f.data) + ' \u2014 ' + Utils.formatNumber(f.km) + ' km \u2014 ' + Utils.formatNumber(f.litros, 1) + 'L' + (Utils.esc(f.posto) ? ' \u2014 ' + Utils.esc(f.posto) : '') + '</option>').join('')}
                                     </select>
                                 </div>
                                 <div class="form-group" style="flex:1">
                                     <label class="form-label" style="font-weight:700;color:var(--accent-primary)">\ud83c\udfc1 Abastecida Final</label>
                                     <select class="form-control" id="media-fuel-end" onchange="Pages.driverClosing.recalcMedia()">
-                                        ${allF.map((f, i, arr) => '<option value="' + f.id + '"' + (i === arr.length - 1 ? ' selected' : '') + '>' + (f._prevMonth ? '[M\u00eas ant.] ' : '') + Utils.formatDate(f.data) + ' \u2014 ' + Utils.formatNumber(f.km) + ' km \u2014 ' + Utils.formatNumber(f.litros, 1) + 'L' + (f.posto ? ' \u2014 ' + f.posto : '') + '</option>').join('')}
+                                        ${allF.map((f, i, arr) => '<option value="' + f.id + '"' + (i === arr.length - 1 ? ' selected' : '') + '>' + (f._prevMonth ? '[M\u00eas ant.] ' : '') + Utils.formatDate(f.data) + ' \u2014 ' + Utils.formatNumber(f.km) + ' km \u2014 ' + Utils.formatNumber(f.litros, 1) + 'L' + (Utils.esc(f.posto) ? ' \u2014 ' + Utils.esc(f.posto) : '') + '</option>').join('')}
                                     </select>
                                 </div>
                             </div>
@@ -796,9 +796,9 @@ Pages.driverClosing = {
                         <td class="text-right font-bold ${this._includeMediaPremio ? 'text-success' : 'text-muted'}" style="${!this._includeMediaPremio ? 'text-decoration:line-through' : ''}">${Utils.formatCurrency(c.premioMedia)}</td>
                     </tr>` : ''}
                     ${faixasHtml}
-                    ${c.bonuses.map(b => this._buildItemRowHtml('bonuses', b, `\ud83c\udf81 ${b.descricao || 'B\u00f4nus'}`, Utils.formatCurrency(b.valor), 'text-success')).join('')}
-                    ${c.expenses.map(e => this._buildItemRowHtml('expenses', e, `\ud83d\udccb Reembolso: ${e.descricao || 'Despesa'}`, Utils.formatCurrency(e.valor), 'text-info')).join('')}
-                    ${c.discounts.map(d => this._buildItemRowHtml('discounts', d, `\ud83d\udcb8 ${d.descricao || 'Vale'}`, '-' + Utils.formatCurrency(d.valor), 'text-danger')).join('')}
+                    ${c.bonuses.map(b => this._buildItemRowHtml('bonuses', b, `\ud83c\udf81 ${Utils.esc(b.descricao) || 'B\u00f4nus'}`, Utils.formatCurrency(b.valor), 'text-success')).join('')}
+                    ${c.expenses.map(e => this._buildItemRowHtml('expenses', e, `\ud83d\udccb Reembolso: ${Utils.esc(e.descricao) || 'Despesa'}`, Utils.formatCurrency(e.valor), 'text-info')).join('')}
+                    ${c.discounts.map(d => this._buildItemRowHtml('discounts', d, `\ud83d\udcb8 ${Utils.esc(d.descricao) || 'Vale'}`, '-' + Utils.formatCurrency(d.valor), 'text-danger')).join('')}
                 </tbody>
                 <tfoot><tr style="background:rgba(99,102,241,0.1)"><td class="font-bold" style="font-size:1.05rem">TOTAL A PAGAR</td><td class="text-right font-bold ${c.totalPagar >= 0 ? 'text-success' : 'text-danger'}" style="font-size:1.2rem">${Utils.formatCurrency(c.totalPagar)}</td></tr></tfoot>
             </table>
@@ -834,7 +834,7 @@ Pages.driverClosing = {
                         <tr${checked ? '' : ' style="opacity:0.5"'}>
                             <td style="text-align:center"><input type="checkbox" class="dc-freight-check" data-id="${f.id}" ${checked ? 'checked' : ''} onchange="Pages.driverClosing.recalcFromSelection()"></td>
                             <td>${Utils.formatDate(f.data)}</td>
-                            <td>${f.origem} \u279c ${f.destino}</td>
+                            <td>${Utils.esc(f.origem)} \u279c ${Utils.esc(f.destino)}</td>
                             <td>${Utils.formatNumber(f.km)}</td>
                             <td>${f.tipo === 'carregado' ? '<span class="badge badge-success">Carregado</span>' : '<span class="badge badge-warning">Vazio</span>'}</td>
                             <td class="font-bold">${Utils.formatCurrency(f.valorFrete)}</td>
@@ -1061,12 +1061,12 @@ Pages.driverClosing = {
         const modal = document.getElementById('modal-overlay');
         modal.querySelector('.modal-header h2').textContent = id ? 'Editar Despesa' : 'Nova Despesa Reembolsável';
         modal.querySelector('.modal-body').innerHTML = `
-            <div class="form-group"><label class="form-label">Descrição *</label><input type="text" class="form-control" id="f-descricao" value="${item?.descricao || ''}" placeholder="Pedágio, alimentação, etc."></div>
+            <div class="form-group"><label class="form-label">Descrição *</label><input type="text" class="form-control" id="f-descricao" value="${Utils.esc(item?.descricao) || ''}" placeholder="Pedágio, alimentação, etc."></div>
             <div class="form-row">
                 <div class="form-group"><label class="form-label">Data</label><input type="date" class="form-control" id="f-data" value="${item?.data || new Date().toISOString().split('T')[0]}"></div>
                 <div class="form-group"><label class="form-label">Valor *</label><input type="number" step="0.01" class="form-control" id="f-valor" value="${item?.valor || ''}"></div>
             </div>
-            <div class="form-group"><label class="form-label">Comprovante / Obs</label><input type="text" class="form-control" id="f-obs" value="${item?.obs || ''}"></div>`;
+            <div class="form-group"><label class="form-label">Comprovante / Obs</label><input type="text" class="form-control" id="f-obs" value="${Utils.esc(item?.obs) || ''}"></div>`;
         modal.querySelector('.modal-footer').innerHTML = `<button class="btn btn-secondary" onclick="App.closeModal()">Cancelar</button><button class="btn btn-primary" onclick="Pages.driverClosing.saveExpense(${id || 'null'},${userId})">Salvar</button>`;
         App.openModal();
     },
@@ -1090,7 +1090,7 @@ Pages.driverClosing = {
         const modal = document.getElementById('modal-overlay');
         modal.querySelector('.modal-header h2').textContent = id ? 'Editar Bônus' : 'Novo Prêmio / Bônus';
         modal.querySelector('.modal-body').innerHTML = `
-            <div class="form-group"><label class="form-label">Descrição *</label><input type="text" class="form-control" id="f-descricao" value="${item?.descricao || ''}" placeholder="Bônus por entrega, prêmio especial, etc."></div>
+            <div class="form-group"><label class="form-label">Descrição *</label><input type="text" class="form-control" id="f-descricao" value="${Utils.esc(item?.descricao) || ''}" placeholder="Bônus por entrega, prêmio especial, etc."></div>
             <div class="form-row">
                 <div class="form-group"><label class="form-label">Data</label><input type="date" class="form-control" id="f-data" value="${item?.data || new Date().toISOString().split('T')[0]}"></div>
                 <div class="form-group"><label class="form-label">Valor *</label><input type="number" step="0.01" class="form-control" id="f-valor" value="${item?.valor || ''}"></div>
@@ -1118,7 +1118,7 @@ Pages.driverClosing = {
         const modal = document.getElementById('modal-overlay');
         modal.querySelector('.modal-header h2').textContent = id ? 'Editar Vale / Desconto' : 'Novo Vale / Desconto';
         modal.querySelector('.modal-body').innerHTML = `
-            <div class="form-group"><label class="form-label">Descrição *</label><input type="text" class="form-control" id="f-descricao" value="${item?.descricao || ''}" placeholder="Vale, Adiantamento, Multa, etc."></div>
+            <div class="form-group"><label class="form-label">Descrição *</label><input type="text" class="form-control" id="f-descricao" value="${Utils.esc(item?.descricao) || ''}" placeholder="Vale, Adiantamento, Multa, etc."></div>
             <div class="form-row">
                 <div class="form-group"><label class="form-label">Data</label><input type="date" class="form-control" id="f-data" value="${item?.data || new Date().toISOString().split('T')[0]}"></div>
                 <div class="form-group"><label class="form-label">Valor *</label><input type="number" step="0.01" class="form-control" id="f-valor" value="${item?.valor || ''}"></div>
@@ -1222,9 +1222,9 @@ Pages.driverClosing = {
                     ${(c.qtdFreteFechado || 0) > 0 ? `<tr style="background:#f0f0ff"><td>🔒 Fretes Valor Fechado (${c.qtdFreteFechado}x — ${Utils.formatNumber(c.kmFreteFechado)} km) — Comissão</td><td class="text-right"><strong>${Utils.formatCurrency(c.totalComissaoFechado)}</strong></td></tr>` : ''}
                     ${c.premioMedia > 0 ? `<tr style="background:#f0fff0"><td><strong>Prêmio Média km/L</strong> — Média atual: <strong>${c.mediaKmL} km/L</strong>${c.mediaFuelStart && c.mediaFuelEnd ? `<br><small style="color:#888">Abastecidas consideradas: ${Utils.formatDate(c.mediaFuelStart.data)} a ${Utils.formatDate(c.mediaFuelEnd.data)}</small>` : ''}${includeMedia === false ? '<br><small style="color:#b91c1c">Não incluído neste acerto</small>' : ''}</td><td class="text-right" style="${includeMedia === false ? 'text-decoration:line-through;color:#999' : ''}"><strong>${Utils.formatCurrency(c.premioMedia)}</strong></td></tr>` : ''}
                     ${c.faixaAtingida && includeMedia !== false ? `<tr><td style="padding-left:24px;color:#666">✅ Faixa ${c.faixaAtingida.minMedia} km/L — <strong>APLICADO</strong></td><td class="text-right" style="font-size:11px">${Utils.formatCurrency(c.faixaAtingida.premio)}</td></tr>` : ''}
-                    ${pdfBonuses.map(b => `<tr><td>Prêmio: ${b.descricao} (${Utils.formatDate(b.data)})</td><td class="text-right">${Utils.formatCurrency(b.valor)}</td></tr>`).join('')}
-                    ${pdfExpenses.map(e => `<tr><td>Reembolso: ${e.descricao} (${Utils.formatDate(e.data)})</td><td class="text-right">${Utils.formatCurrency(e.valor)}</td></tr>`).join('')}
-                    ${pdfDiscounts.map(d => `<tr style="color:#b91c1c"><td>${d.descricao || 'Vale'} (${Utils.formatDate(d.data)})</td><td class="text-right">-${Utils.formatCurrency(d.valor)}</td></tr>`).join('')}
+                    ${pdfBonuses.map(b => `<tr><td>Prêmio: ${Utils.esc(b.descricao)} (${Utils.formatDate(b.data)})</td><td class="text-right">${Utils.formatCurrency(b.valor)}</td></tr>`).join('')}
+                    ${pdfExpenses.map(e => `<tr><td>Reembolso: ${Utils.esc(e.descricao)} (${Utils.formatDate(e.data)})</td><td class="text-right">${Utils.formatCurrency(e.valor)}</td></tr>`).join('')}
+                    ${pdfDiscounts.map(d => `<tr style="color:#b91c1c"><td>${Utils.esc(d.descricao) || 'Vale'} (${Utils.formatDate(d.data)})</td><td class="text-right">-${Utils.formatCurrency(d.valor)}</td></tr>`).join('')}
                     <tr class="total-row"><td>TOTAL A PAGAR</td><td class="text-right">${Utils.formatCurrency(c.totalPagar)}</td></tr>
                 </tbody>
             </table>
@@ -1235,7 +1235,7 @@ Pages.driverClosing = {
                 <tbody>
                     ${pdfFreights.map(f => `<tr>
                         <td>${Utils.formatDate(f.data)}</td>
-                        <td>${f.origem} <span style="color:#aaa">➝</span> ${f.destino}</td>
+                        <td>${Utils.esc(f.origem)} <span style="color:#aaa">➝</span> ${Utils.esc(f.destino)}</td>
                         <td>${Utils.formatNumber(f.km)}</td>
                         <td>${f.tipo === 'carregado' ? 'Carregado' : 'Vazio'}</td>
                         <td class="text-right">${Utils.formatCurrency(f.valorFrete)}</td>

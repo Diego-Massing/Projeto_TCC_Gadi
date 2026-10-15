@@ -1,6 +1,12 @@
 // ===== UTILITY MODULE =====
 
 const Utils = {
+    // Escapa texto do banco antes de ir pro HTML (innerHTML / value="..."). null/undefined
+    // viram '' — então `${Utils.esc(x) || '—'}` continua mostrando o traço.
+    esc(s) {
+        return s == null ? '' : String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    },
+
     // Chronological order for fuelings: by date; same date by km only when BOTH have
     // it. A missing km defaults to 0 and would otherwise always sort before same-day
     // entries that do have km, even when it was fueled later that day — fall back to

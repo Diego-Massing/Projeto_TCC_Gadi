@@ -63,13 +63,13 @@ Pages.monthlyClosing = {
                         <div class="form-group" style="flex:1">
                             <label class="form-label" style="font-weight:700;color:var(--accent-warning)">🏁 Abastecida Inicial</label>
                             <select class="form-control" id="mc-fuel-start" onchange="Pages.monthlyClosing.recalcMedia(${idx})">
-                                ${allF.map((f, i) => `<option value="${f.id}" ${i === 0 ? 'selected' : ''}>${f._prevMonth ? '[Mês ant.] ' : ''}${Utils.formatDate(f.data)} — ${Utils.formatNumber(f.km)} km — ${Utils.formatNumber(f.litros, 1)}L${f.posto ? ' — ' + f.posto : ''}</option>`).join('')}
+                                ${allF.map((f, i) => `<option value="${f.id}" ${i === 0 ? 'selected' : ''}>${f._prevMonth ? '[Mês ant.] ' : ''}${Utils.formatDate(f.data)} — ${Utils.formatNumber(f.km)} km — ${Utils.formatNumber(f.litros, 1)}L${Utils.esc(f.posto) ? ' — ' + Utils.esc(f.posto) : ''}</option>`).join('')}
                             </select>
                         </div>
                         <div class="form-group" style="flex:1">
                             <label class="form-label" style="font-weight:700;color:var(--accent-primary)">🏁 Abastecida Final</label>
                             <select class="form-control" id="mc-fuel-end" onchange="Pages.monthlyClosing.recalcMedia(${idx})">
-                                ${allF.map((f, i, arr) => `<option value="${f.id}" ${i === arr.length - 1 ? 'selected' : ''}>${f._prevMonth ? '[Mês ant.] ' : ''}${Utils.formatDate(f.data)} — ${Utils.formatNumber(f.km)} km — ${Utils.formatNumber(f.litros, 1)}L${f.posto ? ' — ' + f.posto : ''}</option>`).join('')}
+                                ${allF.map((f, i, arr) => `<option value="${f.id}" ${i === arr.length - 1 ? 'selected' : ''}>${f._prevMonth ? '[Mês ant.] ' : ''}${Utils.formatDate(f.data)} — ${Utils.formatNumber(f.km)} km — ${Utils.formatNumber(f.litros, 1)}L${Utils.esc(f.posto) ? ' — ' + Utils.esc(f.posto) : ''}</option>`).join('')}
                             </select>
                         </div>
                     </div>

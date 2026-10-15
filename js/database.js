@@ -266,7 +266,7 @@ class FrotaDatabase {
     // ===== SETTINGS =====
 
     async getSetting(key) {
-        const { data, error } = await supabase.from('settings').select('value').eq('key', key).single();
+        const { data, error } = await supabase.from('settings').select('value').eq('key', key).maybeSingle();
         if (error || !data) return null;
         return data.value;
     }

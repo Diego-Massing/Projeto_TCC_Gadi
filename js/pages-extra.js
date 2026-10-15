@@ -80,7 +80,7 @@ Pages.tiresAnalytics = {
                     <td>${dataStr}</td>
                     <td class="font-mono font-bold">${t?.placa || '—'}</td>
                     <td class="font-mono font-bold">${h.fogo || '—'}</td>
-                    <td>${h.marca || '—'}</td>
+                    <td>${Utils.esc(h.marca) || '—'}</td>
                     <td>Eixo ${h.eixoOriginal} (${h.posicaoOriginal})</td>
                     <td><span class="badge" style="background:var(--bg-input);color:var(--text-secondary)">${h.statusNaRetirada || '—'}</span></td>
                     <td class="font-bold text-success">${Utils.formatNumber(h.kmRodados || 0)} KM</td>
@@ -309,7 +309,7 @@ Pages.fines = {
         const total = fines.reduce((s, f) => s + (f.valor || 0), 0);
         return `<div class="table-container"><table class="data-table"><thead><tr><th>Placa</th><th>Data</th><th>Descrição</th><th>Local</th><th>Valor</th><th>Pontos</th><th>Status</th><th></th></tr></thead><tbody>${fines.map(f => {
             const t = trucks.find(tt => tt.id === f.truckId); return `<tr>
-                <td class="font-mono font-bold">${t?.placa || '—'}</td><td>${Utils.formatDate(f.data)}</td><td>${f.descricao || '—'}</td><td>${f.local || '—'}</td>
+                <td class="font-mono font-bold">${t?.placa || '—'}</td><td>${Utils.formatDate(f.data)}</td><td>${Utils.esc(f.descricao) || '—'}</td><td>${Utils.esc(f.local) || '—'}</td>
                 <td class="font-bold text-danger">${Utils.formatCurrency(f.valor)}</td><td>${f.pontos || '—'}</td>
                 <td><span class="badge ${f.status === 'paga' ? 'badge-success' : f.status === 'recorrida' ? 'badge-info' : 'badge-danger'}">${f.status || 'pendente'}</span></td>
                 <td>${App.userRole === 'admin' ? `<button class="btn btn-icon btn-secondary btn-sm" onclick="Pages.fines.showForm(${f.id})">✏️</button> <button class="btn btn-icon btn-sm" style="color:var(--accent-danger)" onclick="Pages.fines.remove(${f.id})">🗑️</button>` : ''}</td>
@@ -336,9 +336,9 @@ Pages.fines = {
                 <div class="form-group"><label class="form-label">Caminhão *</label><select class="form-control" id="f-truckId"><option value="">Selecione</option>${trucks.map(t => `<option value="${t.id}" ${(item?.truckId === t.id || presetTruckId === t.id) ? 'selected' : ''}>${t.placa}</option>`).join('')}</select></div>
                 <div class="form-group"><label class="form-label">Data *</label><input type="date" class="form-control" id="f-data" value="${item?.data || new Date().toISOString().split('T')[0]}"></div>
             </div>
-            <div class="form-group"><label class="form-label">Descrição</label><input type="text" class="form-control" id="f-descricao" value="${item?.descricao || ''}" placeholder="Excesso de velocidade"></div>
+            <div class="form-group"><label class="form-label">Descrição</label><input type="text" class="form-control" id="f-descricao" value="${Utils.esc(item?.descricao) || ''}" placeholder="Excesso de velocidade"></div>
             <div class="form-row">
-                <div class="form-group"><label class="form-label">Local</label><input type="text" class="form-control" id="f-local" value="${item?.local || ''}"></div>
+                <div class="form-group"><label class="form-label">Local</label><input type="text" class="form-control" id="f-local" value="${Utils.esc(item?.local) || ''}"></div>
                 <div class="form-group"><label class="form-label">Valor *</label><input type="number" step="0.01" class="form-control" id="f-valor" value="${item?.valor || ''}"></div>
             </div>
             <div class="form-row">
@@ -919,7 +919,7 @@ Pages.dataImport = {
                     <small class="text-muted">Para datas dd/mm sem ano</small></div>
                 </div>
                 <div class="table-container mt-2" style="max-height:400px;overflow-y:auto"><table class="data-table"><thead><tr><th>Mês</th><th>Data</th><th>KM</th><th>Posto</th><th>Litros</th><th>Valor Diesel</th><th>Valor Arla</th></tr></thead><tbody>${rows.slice(0, 30).map(r => `<tr>
-                    <td>${r.mes}</td><td>${r.dataRaw}</td><td>${r.kmRaw}</td><td>${r.posto}</td>
+                    <td>${r.mes}</td><td>${r.dataRaw}</td><td>${r.kmRaw}</td><td>${Utils.esc(r.posto)}</td>
                     <td>${r.litrosRaw}</td><td>${r.valorDieselRaw}</td><td>${r.valorArlaRaw || '—'}</td>
                 </tr>`).join('')}</tbody></table></div>
                 ${rows.length > 30 ? `<p class="text-muted mt-1">Mostrando 30 de ${rows.length} linhas</p>` : ''}
@@ -1060,7 +1060,7 @@ Pages.dataImport = {
                     <div class="form-group"><label class="form-label">Placa</label><input type="text" class="form-control" id="fleet-placa" value="${placa}" placeholder="Ex: JCU7I43" style="max-width:150px;font-weight:700;text-transform:uppercase"></div>
                     <div class="form-group"><label class="form-label">Ano base das datas *</label><input type="number" class="form-control" id="fleet-ano" value="${currentYear}" style="max-width:100px" placeholder="2025">
                     <small class="text-muted">Para datas dd/mm sem ano</small></div>
-                    <div class="form-group"><label class="form-label">Motorista</label><select class="form-control" id="fleet-userId" style="max-width:220px"><option value="">— Nenhum específico —</option>${drivers.map(d => `<option value="${d.id}" ${suggestedDriver?.id === d.id ? 'selected' : ''}>${d.nome}</option>`).join('')}</select></div>
+                    <div class="form-group"><label class="form-label">Motorista</label><select class="form-control" id="fleet-userId" style="max-width:220px"><option value="">— Nenhum específico —</option>${drivers.map(d => `<option value="${d.id}" ${suggestedDriver?.id === d.id ? 'selected' : ''}>${Utils.esc(d.nome)}</option>`).join('')}</select></div>
                 </div>
                 <div class="card mb-3" style="background:var(--bg-primary);border:2px solid var(--accent-primary)">
                     <div class="card-body">
@@ -1081,8 +1081,8 @@ Pages.dataImport = {
                     </div>
                 </div>
                 <div class="table-container mt-2" style="max-height:400px;overflow-y:auto"><table class="data-table"><thead><tr><th>Tipo</th><th>Origem</th><th>Destino</th><th>KM</th><th>Data</th></tr></thead><tbody>${rows.slice(0, 30).map(r => `<tr>
-                    <td><span class="badge ${r.tipo === 'carregado' ? 'badge-success' : r.tipo === 'vazio' ? 'badge-warning' : 'badge-info'}">${r.tipo}</span></td>
-                    <td>${r.origem}</td><td>${r.destino || '—'}</td><td>${r.kmRaw}</td>
+                    <td><span class="badge ${r.tipo === 'carregado' ? 'badge-success' : r.tipo === 'vazio' ? 'badge-warning' : 'badge-info'}">${Utils.esc(r.tipo)}</span></td>
+                    <td>${Utils.esc(r.origem)}</td><td>${Utils.esc(r.destino) || '—'}</td><td>${r.kmRaw}</td>
                     <td>${r.dataRaw}</td>
                 </tr>`).join('')}</tbody></table></div>
                 ${rows.length > 30 ? `<p class="text-muted mt-1">Mostrando 30 de ${rows.length} linhas</p>` : ''}
@@ -1203,7 +1203,7 @@ Pages.dataImport = {
         let driverPickerHtml = '';
         if (type === 'freights') {
             const drivers = (await db.getAll('users')).filter(u => u.role === 'motorista');
-            driverPickerHtml = `<div class="form-group"><label class="form-label">Motorista (aplica a todas as linhas)</label><select class="form-control" id="map-userId" style="max-width:220px"><option value="">— Nenhum específico —</option>${drivers.map(d => `<option value="${d.id}">${d.nome}</option>`).join('')}</select></div>`;
+            driverPickerHtml = `<div class="form-group"><label class="form-label">Motorista (aplica a todas as linhas)</label><select class="form-control" id="map-userId" style="max-width:220px"><option value="">— Nenhum específico —</option>${drivers.map(d => `<option value="${d.id}">${Utils.esc(d.nome)}</option>`).join('')}</select></div>`;
         }
         document.getElementById('import-preview').innerHTML = `
             <div class="card"><div class="card-header"><h3>Preview — ${this.csvData.rows.length} linhas encontradas</h3></div><div class="card-body">

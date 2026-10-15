@@ -23,7 +23,7 @@ Pages.truckDetail = {
 
         document.getElementById('page-content').innerHTML = `
             <div class="page-header"><div class="page-header-row">
-                <div><button class="btn btn-secondary btn-sm" onclick="App.navigate('trucks')" style="margin-bottom:8px">\u2190 Voltar</button><h1 class="page-title">${truck.placa}</h1><p class="page-subtitle">${truck.modelo || ''} ${truck.ano || ''} \u2014 ${motorista || 'Sem motorista'}</p></div>
+                <div><button class="btn btn-secondary btn-sm" onclick="App.navigate('trucks')" style="margin-bottom:8px">\u2190 Voltar</button><h1 class="page-title">${truck.placa}</h1><p class="page-subtitle">${Utils.esc(truck.modelo) || ''} ${truck.ano || ''} \u2014 ${motorista || 'Sem motorista'}</p></div>
             </div></div>
             <div class="page-body">
                 <div class="filter-bar" style="margin-bottom:16px">
@@ -103,7 +103,7 @@ Pages.truckDetail = {
         return `<div class="d-flex justify-between align-center mb-2"><h3>Abastecimentos</h3><button class="btn btn-primary btn-sm" onclick="Pages.fuelings.showForm(null,${this.truckId})">＋ Novo</button></div>
         ${fuelings.length === 0 ? '<div class="empty-state"><div class="empty-icon">⛽</div><h3>Nenhum abastecimento</h3></div>' :
                 `<div class="table-container"><table class="data-table"><thead><tr><th>Data</th><th>Posto</th><th>Litros</th><th>R$/L</th><th>KM</th><th>Total</th><th>Tipo</th><th></th></tr></thead><tbody>${fuelings.sort((a, b) => Utils.fuelCompare(b, a)).map(f => `<tr>
-                <td>${Utils.formatDate(f.data)}</td><td>${f.posto || '—'}</td><td>${Utils.formatNumber(f.litros, 2)}</td><td>${Utils.formatCurrency(f.valorLitro)}</td>
+                <td>${Utils.formatDate(f.data)}</td><td>${Utils.esc(f.posto) || '—'}</td><td>${Utils.formatNumber(f.litros, 2)}</td><td>${Utils.formatCurrency(f.valorLitro)}</td>
                 <td>${Utils.formatNumber(f.km)}</td><td class="font-bold">${Utils.formatCurrency(f.valorTotal)}</td><td><span class="badge badge-info">${f.tipoComb || 'Diesel'}</span></td>
                 <td><button class="btn btn-icon btn-secondary btn-sm" onclick="Pages.fuelings.showForm(${f.id},${f.truckId})">✏️</button> <button class="btn btn-icon btn-sm" style="color:var(--accent-danger)" onclick="Pages.fuelings.remove(${f.id})">🗑️</button></td>
             </tr>`).join('')}</tbody></table></div>`}`;
@@ -113,9 +113,9 @@ Pages.truckDetail = {
         return `<div class="d-flex justify-between align-center mb-2"><h3>Fretes</h3><button class="btn btn-primary btn-sm" onclick="Pages.freights.showForm(null,${this.truckId})">＋ Novo</button></div>
         ${freights.length === 0 ? '<div class="empty-state"><div class="empty-icon">📦</div><h3>Nenhum frete</h3></div>' :
                 `<div class="table-container"><table class="data-table"><thead><tr><th>Data</th><th>Origem</th><th>Destino</th><th>KM</th><th>Tipo</th><th>Valor Frete</th><th>Cliente</th><th></th></tr></thead><tbody>${freights.sort((a, b) => b.data?.localeCompare(a.data)).map(f => `<tr>
-                <td>${Utils.formatDate(f.data)}</td><td>${f.origem || '—'}</td><td>${f.destino || '—'}</td><td>${Utils.formatNumber(f.km)}</td>
-                <td><span class="badge ${f.tipo === 'carregado' ? 'badge-success' : 'badge-warning'}">${f.tipo || '—'}</span></td>
-                <td class="font-bold">${Utils.formatCurrency(f.valorFrete)}</td><td>${f.cliente || '—'}</td>
+                <td>${Utils.formatDate(f.data)}</td><td>${Utils.esc(f.origem) || '—'}</td><td>${Utils.esc(f.destino) || '—'}</td><td>${Utils.formatNumber(f.km)}</td>
+                <td><span class="badge ${f.tipo === 'carregado' ? 'badge-success' : 'badge-warning'}">${Utils.esc(f.tipo) || '—'}</span></td>
+                <td class="font-bold">${Utils.formatCurrency(f.valorFrete)}</td><td>${Utils.esc(f.cliente) || '—'}</td>
                 <td><button class="btn btn-icon btn-secondary btn-sm" onclick="Pages.freights.showForm(${f.id},${f.truckId})">✏️</button> <button class="btn btn-icon btn-sm" style="color:var(--accent-danger)" onclick="Pages.freights.remove(${f.id})">🗑️</button></td>
             </tr>`).join('')}</tbody></table></div>`}`;
     },
@@ -125,9 +125,9 @@ Pages.truckDetail = {
         ${expenses.length === 0 ? '<div class="empty-state"><div class="empty-icon">💸</div><h3>Nenhuma despesa</h3></div>' :
                 `<div class="table-container"><table class="data-table"><thead><tr><th>Data</th><th>Tipo</th><th>Fornecedor</th><th>Descrição</th><th>Valor</th><th></th></tr></thead><tbody>${expenses.sort((a, b) => b.data?.localeCompare(a.data)).map(e => `<tr>
                 <td>${Utils.formatDate(e.data)}</td>
-                <td><span class="badge badge-secondary">${e.tipo}</span></td>
-                <td>${e.fornecedor || '—'}</td>
-                <td>${e.descricao || '—'}</td>
+                <td><span class="badge badge-secondary">${Utils.esc(e.tipo)}</span></td>
+                <td>${Utils.esc(e.fornecedor) || '—'}</td>
+                <td>${Utils.esc(e.descricao) || '—'}</td>
                 <td class="font-bold text-danger">-${Utils.formatCurrency(e.valor)}</td>
                 <td><button class="btn btn-icon btn-secondary btn-sm" onclick="Pages.truckExpenses.showForm(${e.id})">✏️</button> <button class="btn btn-icon btn-sm" style="color:var(--accent-danger)" onclick="Pages.truckExpenses.remove(${e.id})">🗑️</button></td>
             </tr>`).join('')}</tbody></table></div>`}`;
@@ -137,7 +137,7 @@ Pages.truckDetail = {
         return `<div class="d-flex justify-between align-center mb-2"><h3>Multas</h3><button class="btn btn-primary btn-sm" onclick="Pages.fines.showForm(null,${this.truckId})">＋ Nova</button></div>
         ${fines.length === 0 ? '<div class="empty-state"><div class="empty-icon">✅</div><h3>Nenhuma multa</h3></div>' :
                 `<div class="table-container"><table class="data-table"><thead><tr><th>Data</th><th>Descrição</th><th>Local</th><th>Valor</th><th>Pontos</th><th>Status</th><th></th></tr></thead><tbody>${fines.sort((a, b) => b.data?.localeCompare(a.data)).map(f => `<tr>
-                <td>${Utils.formatDate(f.data)}</td><td>${f.descricao || '—'}</td><td>${f.local || '—'}</td>
+                <td>${Utils.formatDate(f.data)}</td><td>${Utils.esc(f.descricao) || '—'}</td><td>${Utils.esc(f.local) || '—'}</td>
                 <td class="font-bold text-danger">${Utils.formatCurrency(f.valor)}</td><td>${f.pontos || '—'}</td>
                 <td><span class="badge ${f.status === 'paga' ? 'badge-success' : f.status === 'recorrida' ? 'badge-info' : 'badge-danger'}">${f.status || 'pendente'}</span></td>
                 <td><button class="btn btn-icon btn-secondary btn-sm" onclick="Pages.fines.showForm(${f.id},${f.truckId})">✏️</button> <button class="btn btn-icon btn-sm" style="color:var(--accent-danger)" onclick="Pages.fines.remove(${f.id})">🗑️</button></td>
@@ -334,13 +334,13 @@ Pages.truckDetail = {
                         <div class="form-group" style="flex:1">
                             <label class="form-label" style="font-weight:700;color:var(--accent-warning)">\ud83c\udfc1 Abastecida Inicial</label>
                             <select class="form-control" id="truck-media-start" onchange="Pages.truckDetail.recalcTruckMedia()">
-                                ${sortedFuelings.map((f, i) => '<option value="' + f.id + '"' + (i === 0 ? ' selected' : '') + '>' + (f._prevMonth ? '[M\u00eas ant.] ' : '') + Utils.formatDate(f.data) + ' \u2014 ' + Utils.formatNumber(f.km) + ' km \u2014 ' + Utils.formatNumber(f.litros, 1) + 'L' + (f.posto ? ' \u2014 ' + f.posto : '') + '</option>').join('')}
+                                ${sortedFuelings.map((f, i) => '<option value="' + f.id + '"' + (i === 0 ? ' selected' : '') + '>' + (f._prevMonth ? '[M\u00eas ant.] ' : '') + Utils.formatDate(f.data) + ' \u2014 ' + Utils.formatNumber(f.km) + ' km \u2014 ' + Utils.formatNumber(f.litros, 1) + 'L' + (Utils.esc(f.posto) ? ' \u2014 ' + Utils.esc(f.posto) : '') + '</option>').join('')}
                             </select>
                         </div>
                         <div class="form-group" style="flex:1">
                             <label class="form-label" style="font-weight:700;color:var(--accent-primary)">\ud83c\udfc1 Abastecida Final</label>
                             <select class="form-control" id="truck-media-end" onchange="Pages.truckDetail.recalcTruckMedia()">
-                                ${sortedFuelings.map((f, i, arr) => '<option value="' + f.id + '"' + (i === arr.length - 1 ? ' selected' : '') + '>' + (f._prevMonth ? '[M\u00eas ant.] ' : '') + Utils.formatDate(f.data) + ' \u2014 ' + Utils.formatNumber(f.km) + ' km \u2014 ' + Utils.formatNumber(f.litros, 1) + 'L' + (f.posto ? ' \u2014 ' + f.posto : '') + '</option>').join('')}
+                                ${sortedFuelings.map((f, i, arr) => '<option value="' + f.id + '"' + (i === arr.length - 1 ? ' selected' : '') + '>' + (f._prevMonth ? '[M\u00eas ant.] ' : '') + Utils.formatDate(f.data) + ' \u2014 ' + Utils.formatNumber(f.km) + ' km \u2014 ' + Utils.formatNumber(f.litros, 1) + 'L' + (Utils.esc(f.posto) ? ' \u2014 ' + Utils.esc(f.posto) : '') + '</option>').join('')}
                             </select>
                         </div>
                     </div>
@@ -604,7 +604,7 @@ Pages.truckDetail = {
             </div>
             <div class="form-row">
                 <div class="form-group" style="flex:1"><label class="form-label">Fogo do Pneu *</label><input type="text" class="form-control" id="tr-fogo" value="${tire?.fogo || ''}" style="text-transform:uppercase"></div>
-                <div class="form-group" style="flex:1"><label class="form-label">Marca</label><input type="text" class="form-control" id="tr-marca" value="${tire?.marca || ''}"></div>
+                <div class="form-group" style="flex:1"><label class="form-label">Marca</label><input type="text" class="form-control" id="tr-marca" value="${Utils.esc(tire?.marca) || ''}"></div>
             </div>
             <div class="form-row">
                 <div class="form-group" style="flex:1"><label class="form-label">KM de Instalação</label><input type="number" class="form-control" id="tr-km" value="${tire?.kmInstalacao || this._truckData.truck.kmAtual || 0}"></div>
@@ -686,7 +686,7 @@ Pages.truckDetail = {
         <p class="text-muted" style="font-size:0.82rem;margin-bottom:12px">Despesas recorrentes cobradas todo mês para este caminhão (prestação, rastreador, seguro, etc.)</p>
         ${items.length === 0 ? '<div class="empty-state"><div class="empty-icon">📌</div><h3>Nenhuma despesa fixa cadastrada</h3><p>Adicione despesas que se repetem todo mês.</p></div>' :
             `<div class="table-container"><table class="data-table"><thead><tr><th>Descrição</th><th>Valor Mensal</th><th></th></tr></thead><tbody>${items.map((e, i) => `<tr>
-                <td class="font-bold">${e.descricao}</td>
+                <td class="font-bold">${Utils.esc(e.descricao)}</td>
                 <td class="font-bold text-danger">${Utils.formatCurrency(e.valor)}</td>
                 <td><button class="btn btn-icon btn-sm" style="color:var(--accent-danger)" onclick="Pages.truckDetail.removeFixedExpense(${i})">🗑️</button></td>
             </tr>`).join('')}</tbody></table></div>

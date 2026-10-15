@@ -195,7 +195,7 @@ Pages.dashboard = {
         return `<div style="display:flex;flex-direction:column;gap:10px">${pending.map(f => {
             const truck = trucks.find(t => t.id === f.truckId);
             return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg-input);border-radius:var(--radius-md)">
-                <div><span class="font-mono font-bold">${truck?.placa || '—'}</span> <span class="text-muted" style="margin-left:8px">${Utils.formatDate(f.data)}</span><br><small class="text-muted">${f.descricao || ''}</small></div>
+                <div><span class="font-mono font-bold">${truck?.placa || '—'}</span> <span class="text-muted" style="margin-left:8px">${Utils.formatDate(f.data)}</span><br><small class="text-muted">${Utils.esc(f.descricao) || ''}</small></div>
                 <span class="text-danger font-bold">${Utils.formatCurrency(f.valor)}</span>
             </div>`;
         }).join('')}</div>`;
@@ -287,7 +287,7 @@ Pages.trucks = {
                     const totalFreight = tFreight.reduce((s, f) => s + (f.valorFrete || 0), 0);
                     return `<div class="truck-card" onclick="App.navigate('truck-detail',${t.id})">
                         <div style="display:flex;justify-content:space-between;align-items:start">
-                            <div><div class="truck-placa">${t.placa}</div><div class="truck-info">${t.modelo || ''} ${t.ano || ''} — ${(drivers[t.id] || []).join(', ') || 'Sem motorista'}</div></div>
+                            <div><div class="truck-placa">${t.placa}</div><div class="truck-info">${Utils.esc(t.modelo) || ''} ${t.ano || ''} — ${(drivers[t.id] || []).join(', ') || 'Sem motorista'}</div></div>
                             <span class="badge ${t.status === 'ativo' ? 'badge-success' : 'badge-warning'}">${t.status || 'ativo'}</span>
                         </div>
                         <div class="truck-stats">
@@ -313,7 +313,7 @@ Pages.trucks = {
             modal.querySelector('.modal-body').innerHTML = `
                 <div class="form-row">
                     <div class="form-group"><label class="form-label">Placa *</label><input type="text" class="form-control" id="f-placa" value="${truck?.placa || ''}" placeholder="ABC-1234" maxlength="8" style="text-transform:uppercase"></div>
-                    <div class="form-group"><label class="form-label">Modelo</label><input type="text" class="form-control" id="f-modelo" value="${truck?.modelo || ''}" placeholder="Scania R450"></div>
+                    <div class="form-group"><label class="form-label">Modelo</label><input type="text" class="form-control" id="f-modelo" value="${Utils.esc(truck?.modelo) || ''}" placeholder="Scania R450"></div>
                 </div>
                 <div class="form-row">
                     <div class="form-group"><label class="form-label">Ano</label><input type="number" class="form-control" id="f-ano" value="${truck?.ano || ''}" placeholder="2023"></div>

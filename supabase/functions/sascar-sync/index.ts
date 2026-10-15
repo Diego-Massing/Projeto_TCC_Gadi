@@ -19,13 +19,17 @@ Deno.serve(async (req: Request) => {
     const secretMap = Object.fromEntries((secrets ?? []).map((s: any) => [s.name, s.decrypted_secret]));
 
     // verify_jwt is disabled at the gateway (cron calls have no user session), so this
-    // function does its own auth: accept either a logged-in app user, or the cron secret.
-    const userClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
-    });
-    const { data: userData } = await userClient.auth.getUser();
+    // function does its own auth: accept either an admin/visualizador of the app, or the cron secret.
     const cronSecret = req.headers.get("x-cron-secret");
-    if (!userData?.user && cronSecret !== secretMap["sascar_cron_secret"]) {
+    const viaCron = !!cronSecret && cronSecret === secretMap["sascar_cron_secret"];
+    let role: string | null = null;
+    if (!viaCron) {
+      const userClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+        global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
+      });
+      ({ data: role } = await userClient.rpc("current_app_role"));
+    }
+    if (!viaCron && role !== "admin" && role !== "visualizador") {
       return new Response(JSON.stringify({ error: "unauthorized" }), {
         status: 401,
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
