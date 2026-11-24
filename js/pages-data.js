@@ -17,6 +17,11 @@ Pages.fuelings = {
         const addBtn = isViewer ? '' : `<button class="btn btn-primary" onclick="Pages.fuelings.showForm()">＋ Novo Abastecimento</button>`;
         const exportBtn = isDriver ? '' : `<button class="btn btn-secondary btn-sm" onclick="Pages.fuelings.exportCSV()">📥 Exportar CSV</button>`;
         const truckFilter = isDriver ? '' : `<div class="form-group"><label class="form-label">Placa</label><select class="form-control" id="filter-fuel-truck" onchange="Pages.fuelings.applyFilter()"><option value="">Todas</option>${trucks.map(t => `<option value="${t.id}">${t.placa}</option>`).join('')}</select></div>`;
+        // Postos já usados nos lançamentos (sem diferenciar maiúscula/minúscula, espaço ou pontuação:
+        // "QBOX-ARGEN", "QBOX ARGEN" e "Qbox - Argen" viram uma opção só)
+        const postos = [...new Map(fuelings.filter(f => this.postoKey(f.posto)).map(f => [this.postoKey(f.posto), f.posto.trim()])).entries()]
+            .sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'));
+        const postoFilter = `<div class="form-group"><label class="form-label">Posto</label><select class="form-control" id="filter-fuel-posto" onchange="Pages.fuelings.applyFilter()"><option value="">Todos</option>${postos.map(([k, nome]) => `<option value="${Utils.esc(k)}">${Utils.esc(nome)}</option>`).join('')}</select></div>`;
 
         document.getElementById('page-content').innerHTML = `
             <div class="page-header"><div class="page-header-row">
@@ -26,11 +31,16 @@ Pages.fuelings = {
             <div class="page-body">
                 <div class="filter-bar">
                     ${truckFilter}
+                    ${postoFilter}
                     <div class="form-group"><label class="form-label">De</label><input type="date" class="form-control" id="filter-fuel-from" onchange="Pages.fuelings.applyFilter()"></div>
                     <div class="form-group"><label class="form-label">Até</label><input type="date" class="form-control" id="filter-fuel-to" onchange="Pages.fuelings.applyFilter()"></div>
                 </div>
                 <div id="fuelings-table">${this.renderTable(fuelings, trucks)}</div>
             </div>`;
+    },
+
+    postoKey(posto) {
+        return (posto || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     },
 
     renderTable(fuelings, trucks) {
@@ -58,6 +68,8 @@ Pages.fuelings = {
             const truckId = document.getElementById('filter-fuel-truck')?.value;
             if (truckId) fuelings = fuelings.filter(f => f.truckId === parseInt(truckId));
         }
+        const posto = document.getElementById('filter-fuel-posto')?.value;
+        if (posto) fuelings = fuelings.filter(f => this.postoKey(f.posto) === posto);
         const from = document.getElementById('filter-fuel-from')?.value;
         const to = document.getElementById('filter-fuel-to')?.value;
         if (from) fuelings = fuelings.filter(f => f.data >= from);

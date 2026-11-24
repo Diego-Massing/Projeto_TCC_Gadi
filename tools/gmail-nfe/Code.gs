@@ -1,7 +1,7 @@
 // Frota Control — importa as NF-e que os postos mandam por e-mail
 //
 // Roda dentro da conta Gmail da Gadi (script.google.com), a cada 15 min.
-// Procura os e-mails "Arquivo xml e danfe..." do Brambila, pega o anexo -nfe.xml
+// Procura os e-mails dos postos (Brambila e filiais, Petropen, Russi) com XML anexo
 // e envia para o Supabase (função nfe_ingest), que guarda na caixa "Notas recebidas".
 //
 // Não altera nada no Gmail: o projeto só tem permissão de LEITURA (gmail.readonly
@@ -17,7 +17,11 @@ const SUPABASE_URL = 'https://gqoefhecnsayjxyoutzo.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdxb2VmaGVjbnNheWp4eW91dHpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5Njk3MTIsImV4cCI6MjA4NjU0NTcxMn0.WKJD2b59-pDXWXb0tDPPfXwu7GNncY_BHBjyBe9hY4k';
 
 // Remetentes das notas. Para outro posto, acrescente o domínio aqui.
-const BUSCA = '(from:gbrambila.com.br) subject:"Arquivo xml" has:attachment';
+//   gbrambila.com.br      — Brambila (matriz e filiais: nffilial1@, nffilial3@...)
+//   redegraal.com.br      — Auto Posto Petropen (Rede Graal)
+//   rederussi.com.br      — Rede Russi (envios.rederussi.com.br)
+// Só pega e-mail com anexo .xml; o banco descarta o que não for NF-e para a Gadi.
+const BUSCA = '{from:gbrambila.com.br from:redegraal.com.br from:rederussi.com.br} has:attachment filename:xml';
 
 function importarNotas() {
   const props = PropertiesService.getScriptProperties();

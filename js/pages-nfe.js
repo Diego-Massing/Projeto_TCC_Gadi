@@ -34,7 +34,7 @@ Pages.nfe = {
         const obs = one(inf, 'infCpl');
         const placa = (obs.match(/Placa:\s*([A-Z0-9]{3}-?[A-Z0-9]{4})/i) || [])[1] || '';
         const km = (obs.match(/KM:\s*([\d.]+)/i) || [])[1] || '';
-        const motorista = ((obs.match(/Motorista:\s*([^\n]+?)\s*(?:-|$)/i) || [])[1] || '').trim();
+        const motorista = ((obs.match(/Motorista:\s*([^\n|]+?)\s*(?:-|\||$)/i) || [])[1] || '').trim();
         return {
             chave: (inf.getAttribute('Id') || '').replace('NFe', ''),
             numero: one(inf, 'nNF'),
@@ -73,6 +73,13 @@ Pages.nfe = {
         return { truck: cands.length === 1 ? cands[0] : null, exata: false };
     },
 
+    // Nome do posto igual ao usado nos lançamentos manuais (todas as filiais com o mesmo nome).
+    postoNome(n) {
+        const redes = [[/BRAMBILA/i, 'BRAMBILA'], [/PETROPEN/i, 'PETROPEN'], [/RUSSI/i, 'RUSSI']];
+        const r = redes.find(([re]) => re.test(n.emitenteNome) || re.test(n.emitente));
+        return r ? r[1] : n.emitente;
+    },
+
     // Monta o abastecimento proposto para uma nota (mesmo formato do lançamento manual:
     // diesel + arla na mesma linha "Diesel+Arla"; nota só de arla vira linha "Arla").
     propose(row) {
@@ -95,7 +102,7 @@ Pages.nfe = {
         }
         const m = this.matchTruck(n.placa);
         const p = { nota: n, fueling: f, truckId: m.truck?.id || null, km: f?.tipoComb === 'Arla' ? 0 : n.km,
-                    posto: /BRAMBILA/i.test(n.emitenteNome) ? 'BRAMBILA' : n.emitente, alertas: [] };
+                    posto: this.postoNome(n), alertas: [] };
 
         if (!f) p.alertas.push('Nota sem diesel nem arla — provavelmente não é abastecimento');
         if (outros.length) p.alertas.push(`Itens que não entram no abastecimento: ${outros.map(i => i.nome).join(', ')}`);
