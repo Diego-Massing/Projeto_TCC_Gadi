@@ -18,10 +18,19 @@ Pages.fuelings = {
         const exportBtn = isDriver ? '' : `<button class="btn btn-secondary btn-sm" onclick="Pages.fuelings.exportCSV()">📥 Exportar CSV</button>`;
         const truckFilter = isDriver ? '' : `<div class="form-group"><label class="form-label">Placa</label><select class="form-control" id="filter-fuel-truck" onchange="Pages.fuelings.applyFilter()"><option value="">Todas</option>${trucks.map(t => `<option value="${t.id}">${t.placa}</option>`).join('')}</select></div>`;
         // Postos já usados nos lançamentos (sem diferenciar maiúscula/minúscula, espaço ou pontuação:
-        // "QBOX-ARGEN", "QBOX ARGEN" e "Qbox - Argen" viram uma opção só)
-        const postos = [...new Map(fuelings.filter(f => this.postoKey(f.posto)).map(f => [this.postoKey(f.posto), f.posto.trim()])).entries()]
-            .sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'));
-        const postoFilter = `<div class="form-group"><label class="form-label">Posto</label><select class="form-control" id="filter-fuel-posto" onchange="Pages.fuelings.applyFilter()"><option value="">Todos</option>${postos.map(([k, nome]) => `<option value="${Utils.esc(k)}">${Utils.esc(nome)}</option>`).join('')}</select></div>`;
+        // "QBOX-ARGEN", "QBOX ARGEN" e "Qbox - Argen" viram uma opção só; redes com várias
+        // unidades, como "SIM URU" e "SIM IJUI", aparecem como uma opção "SIM")
+        // Ordem: mais abastecimentos primeiro; empate por nome.
+        const postoMap = new Map();
+        for (const f of fuelings) {
+            const k = this.postoKey(f.posto);
+            if (!k) continue;
+            const p = postoMap.get(k) || { k, nome: this.POSTO_REDES.includes(k) ? k : f.posto.trim(), n: 0 };
+            p.n++;
+            postoMap.set(k, p);
+        }
+        const postos = [...postoMap.values()].sort((a, b) => b.n - a.n || a.nome.localeCompare(b.nome, 'pt-BR'));
+        const postoFilter = `<div class="form-group"><label class="form-label">Posto</label><select class="form-control" id="filter-fuel-posto" onchange="Pages.fuelings.applyFilter()"><option value="">Todos</option>${postos.map(p => `<option value="${Utils.esc(p.k)}">${Utils.esc(p.nome)} (${p.n})</option>`).join('')}</select></div>`;
 
         document.getElementById('page-content').innerHTML = `
             <div class="page-header"><div class="page-header-row">
@@ -39,8 +48,14 @@ Pages.fuelings = {
             </div>`;
     },
 
+    // Redes cujas unidades entram juntas no filtro ("SIM URU", "SIM IJUI"... → SIM)
+    POSTO_REDES: ['SIM', 'QBOX'],
+
     postoKey(posto) {
-        return (posto || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+        const nome = (posto || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+        const chave = nome.replace(/[^A-Z0-9 ]/g, ' ').trim();
+        const rede = this.POSTO_REDES.find(r => chave === r || chave.startsWith(r + ' '));
+        return rede || nome.replace(/[^A-Z0-9]/g, '');
     },
 
     renderTable(fuelings, trucks) {
